@@ -1,25 +1,26 @@
-
 % function f0=simple_FEM_1D_transient(yita)
 
-N=300;
-L=10;
+N=5;
+yita=ones(N,1)*1;
+% yita=[0;yita;0];
+L=1.0;
 h=L/(N-1);
-tau=0.2;
-dt= 0.001;
-xold=ones(N,1)*10;
+tau=0.4;
+dt= 0.01;
+xold=ones(N,1);
 xold(1)=0;
 xold(end)=0;
 x_initial=xold;
 X=zeros(N,1);
-yita=ones(N,1)*11;
 t=0;
-time_step=1000;
+time_step=100;
 solution_store=zeros(N+1,time_step);
+
 %% allcate memory
-A=zeros(N);
-B=zeros(N);
-C=zeros(N);
-D=zeros(N);
+A=sparse(N,N);
+B=sparse(N,N);
+C=sparse(N,N);
+D=sparse(N,N);
 b=zeros(N,1);
 
 %% A=(f1,f2) come with the modified diffusion term
@@ -45,15 +46,14 @@ end
 
 %% It is so important to choose implicit Euler method here,
 %% explicit Euler results in a very small time step.
-
-for T=1:time_step
-    b=A*xold;
-    D=A+dt*(B+C);
+D=A+dt*(B+C);
     %% apply BC
     D(1,:)=0;
     D(N,:)=0;
     D(1,1)=1;
     D(N,N)=1;
+for T=1:time_step
+    b=A*xold;
     b(1)=0;
     b(N)=0;
     %% solving
@@ -64,25 +64,16 @@ for T=1:time_step
 end
 solution_store=[[0;x_initial] solution_store];
 
-% %% plot
-% t=linspace(0,L,N);
+% %% plot solution
+% x=linspace(0,L,N);
 % for i=1:time_step
-%     plot(t,solution_store(2:end,i));
+%     plot(x,solution_store(2:end,i));
 %     title(['T=' num2str(solution_store(1,i))])
 %     ylim([0 1])
 %     pause( 0 )
 % end
 
 %% integrate for f0
-
-% % f0=zeros(N+1,1);
-% % for i=2:N+1
-% %     for j=1:time_step
-% %         value_left=solution_store(i,j)*solution_store(i,time_step-j+2);
-% %         value_right=solution_store(i,j+1)*solution_store(i,time_step-(j+1)+2);
-% %         f0(i)=f0(i)+0.5*(value_left+value_right)*dt;
-% %     end
-% % end
 
 f0=zeros(N+1,1);
 for j=1:time_step
@@ -96,7 +87,7 @@ f0(1)=[];
 
 %% calculate f0_given
 x=linspace(0,L,N);
-x_left=x(1:N*tau);
+x_left=x(1:ceil(N*tau/L));
 f0_given_left=(exp(4*tau*x_left./(tau*tau-x_left.*x_left))-1).^2./((exp(4*tau*x_left./(tau*tau-x_left.*x_left))+1).^2);
 f0_given=ones(1,N);
 f0_given(1:length(f0_given_left))=f0_given_left;
@@ -104,14 +95,17 @@ f0_given(end-length(f0_given_left)+1:end)=fliplr(f0_given_left);
 f0_given(isnan(f0_given)) = 1;
 plot(x,f0_given)
 f0_given_bar=trapz(x,f0_given);
- 
+
 %% calculate Q
 q_final_step_d=solution_store(2:N+1,time_step+1);
-Q=trapz(x,q_final_step_d)
+Q=trapz(x,q_final_step_d)/L;
 % f0(500)
 % yita(4)
 f0=f0*f0_given_bar/Q;
 plot(f0)
+hold on;
+plot(f0_given);
+hold off;
+% pause()
 
 
- 
