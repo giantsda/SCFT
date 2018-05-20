@@ -1,181 +1,161 @@
 #include <stdio.h>
 #include <petscksp.h>
 
+
+
 int
 main ()
 {
-  KSP ksp;
-  PC pc;
-  Mat A, B, C, D;
-  Vec X, b, xold, x_initial;
-  MPI_Comm comm;
-  //  PetscScalar        v;
-  //  KSPConvergedReason reason;
-  //  PetscInt           i,j,its;
-  PetscErrorCode ierr;
+KSP ksp;
+PC pc;
+Mat A, B, C, D;
+Vec X, b, xold, x_initial;
+MPI_Comm comm;
+PetscErrorCode ierr;
 
-  //  PetscFunctionBegin;
-  ierr = PetscInitialize (NULL, NULL, 0, NULL);
-  if (ierr)
-    return ierr;
-  comm = MPI_COMM_SELF;
-  printf ("Hello");
-  int N = 8; // N is the total number of nodes in 1D problem.
-  double L = 1.9, tau = 0.4, dt = 0.01, t = 0, h = L / (N - 1); // L is the length of the space domain
-  int i;
-  int time_step = 7;
-  double yita[N];
-  double solution_store[N + 1][time_step];
-  for (int i = 0; i < N; i++)
+ierr = PetscInitialize (NULL, NULL, 0, NULL);
+if (ierr)
+return ierr;
+comm = MPI_COMM_SELF;
+printf ("Hello");
+int N = 5; // N is the total number of nodes in 1D problem.
+double L = 1., tau = 0.4, dt = 0.01, t = 0, h = L / (N - 1); // L is the length of the space domain
+
+int time_step = 7;
+double yita[N];
+double solution_store[N + 1][time_step];
+for (int i = 0; i < N; i++)
+{
+  yita[i] = 1.;
+}
+
+ierr = MatCreateSeqAIJ (comm, N, N, 3, NULL, &A);
+ierr = MatCreateSeqAIJ (comm, N, N, 3, NULL, &B);
+ierr = MatCreateSeqAIJ (comm, N, N, 3, NULL, &C);
+CHKERRQ (ierr);
+ierr = VecCreateSeq (comm, N, &b);
+CHKERRQ (ierr);
+ierr = VecDuplicate (b, &X);
+CHKERRQ (ierr);
+ierr = VecDuplicate (b, &xold);
+CHKERRQ (ierr);
+ierr = VecDuplicate (b, &x_initial);
+CHKERRQ (ierr);
+
+PetscScalar vforA[3] =
+{ h / 6, 2. / 3 * h, h / 6 };
+PetscScalar vforB[3] =
+{ -1 / h, 2. / h, -1 / h };
+
+for (PetscInt i = 0; i < N; i++)
+{
+     PetscInt column_number[3] =
+    { i - 1, i, i + 1 };
+  PetscScalar vforC[3] =
+    { h / 6 * yita[i], 2. / 3 * h * yita[i], h / 6 * yita[i] };
+  printf ("i=%d\n", i);
+  if (i == 0)
     {
-      yita[i] = 1.;
+      MatSetValues (A, 1, &i, 2, &column_number[1], &vforA[1], INSERT_VALUES);
+      MatSetValues (B, 1, &i, 2, &column_number[1], &vforB[1], INSERT_VALUES);
+      MatSetValues (C, 1, &i, 2, &column_number[1], &vforC[1], INSERT_VALUES);
+      VecSetValue (xold, i, 0., INSERT_VALUES);
     }
-
-  ierr = MatCreateSeqAIJ (comm, N, N, 3, NULL, &A);
-  ierr = MatCreateSeqAIJ (comm, N, N, 3, NULL, &B);
-  ierr = MatCreateSeqAIJ (comm, N, N, 3, NULL, &C);
-  CHKERRQ(ierr);
-  ierr = VecCreateSeq (comm, N, &b);
-  CHKERRQ(ierr);
-  ierr = VecDuplicate (b, &X);
-  CHKERRQ(ierr);
-  ierr = VecDuplicate (b, &xold);
-  CHKERRQ(ierr);
-  ierr = VecDuplicate (b, &x_initial);
-  CHKERRQ(ierr);
-
-  double vforA[3] =
-    { h / 6, 2. / 3 * h, h / 6 };
-  double vforB[3] =
-    { -1 / h, 2. / h, -1 / h };
-
-  for (int i = 0; i < N; i++)
+  else if (i == N - 1)
     {
-      int column_number[3] =
-	{ i - 1, i, i + 1 };
-      double vforC[3] =
-	{ h / 6 * yita[i], 2. / 3 * h * yita[i], h / 6 * yita[i] };
-      printf ("i=%d\n", i);
-      if (i == 0)
-	{
-	  MatSetValues (A, 1, &i, 2, &column_number[1], &vforA[1],
-			INSERT_VALUES);
-	  MatSetValues (B, 1, &i, 2, &column_number[1], &vforB[1],
-			INSERT_VALUES);
-	  MatSetValues (C, 1, &i, 2, &column_number[1], &vforC[1],
-			INSERT_VALUES);
-	  VecSetValue (xold, i, 1., INSERT_VALUES);
-	}
-      else if (i == N - 1)
-	{
-	  MatSetValues (A, 1, &i, 2, &column_number, &vforA, INSERT_VALUES);
-	  MatSetValues (B, 1, &i, 2, &column_number, &vforB, INSERT_VALUES);
-	  MatSetValues (C, 1, &i, 2, &column_number, &vforC, INSERT_VALUES);
-	  VecSetValue (xold, i, 1., INSERT_VALUES);
-	}
-      else
-	{
-	  MatSetValues (A, 1, &i, 3, &column_number, &vforA, INSERT_VALUES);
-	  MatSetValues (B, 1, &i, 3, &column_number, &vforB, INSERT_VALUES);
-	  MatSetValues (C, 1, &i, 3, &column_number, &vforC, INSERT_VALUES);
-	  VecSetValue (xold, i, 0., INSERT_VALUES);
-	}
+      MatSetValues (A, 1, &i, 2, column_number, vforA, INSERT_VALUES);
+      MatSetValues (B, 1, &i, 2, column_number, vforB, INSERT_VALUES);
+      MatSetValues (C, 1, &i, 2, column_number, vforC, INSERT_VALUES);
+      VecSetValue (xold, i, 0., INSERT_VALUES);
     }
-  VecCopy (xold,x_initial);
+  else
+    {
+      MatSetValues (A, 1, &i, 3, column_number, vforA, INSERT_VALUES);
+      MatSetValues (B, 1, &i, 3, column_number, vforB, INSERT_VALUES);
+      MatSetValues (C, 1, &i, 3, column_number, vforC, INSERT_VALUES);
+      VecSetValue (xold, i, 1., INSERT_VALUES);
+    }
+}
+VecCopy (xold, x_initial);
 
+ierr = MatAssemblyBegin (A, MAT_FINAL_ASSEMBLY);
+CHKERRQ (ierr);
+ierr = MatAssemblyEnd (A, MAT_FINAL_ASSEMBLY);
+CHKERRQ (ierr);
+ierr = MatAssemblyBegin (B, MAT_FINAL_ASSEMBLY);
+CHKERRQ (ierr);
+ierr = MatAssemblyEnd (B, MAT_FINAL_ASSEMBLY);
+CHKERRQ (ierr);
+ierr = MatAssemblyBegin (C, MAT_FINAL_ASSEMBLY);
+CHKERRQ (ierr);
+ierr = MatAssemblyEnd (C, MAT_FINAL_ASSEMBLY);
+CHKERRQ (ierr);
+ierr = VecAssemblyBegin (xold);
+CHKERRQ (ierr);
+ierr = VecAssemblyEnd (xold);
+CHKERRQ (ierr);
+MatDuplicate (A, MAT_COPY_VALUES, &D);
 
-  ierr = MatAssemblyBegin (A, MAT_FINAL_ASSEMBLY);
-  CHKERRQ(ierr);
-  ierr = MatAssemblyEnd (A, MAT_FINAL_ASSEMBLY);
-  CHKERRQ(ierr);
-  ierr = MatAssemblyBegin (B, MAT_FINAL_ASSEMBLY);
-  CHKERRQ(ierr);
-  ierr = MatAssemblyEnd (B, MAT_FINAL_ASSEMBLY);
-  CHKERRQ(ierr);
-  ierr = MatAssemblyBegin (C, MAT_FINAL_ASSEMBLY);
-  CHKERRQ(ierr);
-  ierr = MatAssemblyEnd (C, MAT_FINAL_ASSEMBLY);
-  CHKERRQ(ierr);
-  ierr = VecAssemblyBegin (xold);
-  CHKERRQ(ierr);
-  ierr = VecAssemblyEnd (xold);
-  CHKERRQ(ierr);
-  MatDuplicate (A, MAT_COPY_VALUES, &D);
+printf ("A:\n");
+ierr = MatView (A, PETSC_VIEWER_STDOUT_WORLD);
+CHKERRQ (ierr);
+printf ("B:\n");
+ierr = MatView (B, PETSC_VIEWER_STDOUT_WORLD);
+CHKERRQ (ierr);
+printf ("C:\n");
+ierr = MatView (C, PETSC_VIEWER_STDOUT_WORLD);
+CHKERRQ (ierr);
+printf ("D:\n");
+ierr = MatView (D, PETSC_VIEWER_STDOUT_WORLD);
+CHKERRQ (ierr);
+printf ("xold:\n");
+ierr = VecView (xold, 0);
+CHKERRQ (ierr);
 
-  printf ("A:\n");
-  ierr = MatView (A, PETSC_VIEWER_STDOUT_WORLD);
-  CHKERRQ(ierr);
-  printf ("B:\n");
-  ierr = MatView (B, PETSC_VIEWER_STDOUT_WORLD);
-  CHKERRQ(ierr);
-  printf ("C:\n");
-  ierr = MatView (C, PETSC_VIEWER_STDOUT_WORLD);
-  CHKERRQ(ierr);
-  printf ("D:\n");
-  ierr = MatView (D, PETSC_VIEWER_STDOUT_WORLD);
-  CHKERRQ(ierr);
-  printf ("xold:\n");
-  ierr = VecView (xold, 0);
-  CHKERRQ(ierr);
+ierr = MatAXPY (D, dt, B, SAME_NONZERO_PATTERN);  // A=A+dt*B
+ierr = MatAXPY (D, dt, C, SAME_NONZERO_PATTERN);  // A=A+dt*C
+ierr = MatSetValue (D, 0, 0, 1.0, INSERT_VALUES);
+ierr = MatSetValue (D, 0, 1, 0.0, INSERT_VALUES);
+ierr = MatSetValue (D, N - 1, N - 1 - 1, 0.0, INSERT_VALUES);
+ierr = MatSetValue (D, N - 1, N - 1, 1.0, INSERT_VALUES);
+ierr = MatAssemblyBegin (D, MAT_FINAL_ASSEMBLY);
+CHKERRQ (ierr);
+ierr = MatAssemblyEnd (D, MAT_FINAL_ASSEMBLY);
+CHKERRQ (ierr);
 
-for (i=0;i<=time_step;i++)
-  {
-    t=t+dt;
+printf ("D:\n");
+ierr = MatView (D, PETSC_VIEWER_STDOUT_WORLD);
 
+ierr = KSPCreate (comm, &ksp);
+CHKERRQ (ierr);
+ierr = KSPSetOperators (ksp, D, D);
+CHKERRQ (ierr);
+ierr = KSPSetType (ksp, KSPCG);
+CHKERRQ (ierr);
+ierr = KSPSetInitialGuessNonzero (ksp, PETSC_TRUE);
+CHKERRQ (ierr);
+ierr = KSPGetPC (ksp, &pc);
+CHKERRQ (ierr);
+ierr = PCSetType (pc, PCICC);
+CHKERRQ (ierr);
+ierr = KSPSetFromOptions (ksp);
+CHKERRQ (ierr);
+ierr = KSPSetUp (ksp);
+CHKERRQ (ierr);
 
-
-
-
-
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//  ierr = VecView (B, 0);
-//  CHKERRQ (ierr);
-
-//  ierr = KSPCreate (comm, &ksp);
-//  CHKERRQ (ierr);
-//  ierr = KSPSetOperators (ksp, A, A);
-//  CHKERRQ (ierr);
-//  ierr = KSPSetType (ksp, KSPCG);
-//  CHKERRQ (ierr);
-//  ierr = KSPSetInitialGuessNonzero (ksp, PETSC_TRUE);
-//  CHKERRQ (ierr);
-//  ierr = KSPGetPC (ksp, &pc);
-//  CHKERRQ (ierr);
-//  ierr = PCSetType (pc, PCICC);
-//  CHKERRQ (ierr);
-//  ierr = KSPSetFromOptions (ksp);
-//  CHKERRQ (ierr);
-//  ierr = KSPSetUp (ksp);
-//  CHKERRQ (ierr);
-//  ierr = KSPSolve (ksp, B, X);
-//  CHKERRQ (ierr);
-//  ierr = VecView (X, 0);
-//  CHKERRQ (ierr);
+for (int i = 1; i <= time_step; i++)
+{
+  t = t + dt;
+  printf ("time step:%d ; t= %f \n", i, t);
+  ierr = MatMult (A, xold, b);  // b=A*xold;
+  ierr = VecSetValue (b, 0, 0., INSERT_VALUES);
+  ierr = VecSetValue (b, N - 1, 0., INSERT_VALUES);
+  ierr = KSPSolve (ksp, b, X);
+  CHKERRQ (ierr);
+  ierr = VecView (X, 0);
+  CHKERRQ (ierr);
+  VecCopy (X, xold);
+}
 
   //  for (i=0; i<4; i++) {
   //    v    = 3;
@@ -239,20 +219,20 @@ for (i=0;i<=time_step;i++)
   //  ierr = PetscPrintf(PETSC_COMM_WORLD,"\n");CHKERRQ(ierr);
   //
   //  ierr = KSPDestroy(&ksp);CHKERRQ(ierr);
-  ierr = MatDestroy (&A);
-  CHKERRQ(ierr);
-  ierr = MatDestroy (&B);
-  CHKERRQ(ierr);
-  ierr = MatDestroy (&C);
-  CHKERRQ(ierr);
-  ierr = MatDestroy (&D);
-  CHKERRQ(ierr);
+ierr = MatDestroy (&A);
+CHKERRQ (ierr);
+ierr = MatDestroy (&B);
+CHKERRQ (ierr);
+ierr = MatDestroy (&C);
+CHKERRQ (ierr);
+ierr = MatDestroy (&D);
+CHKERRQ (ierr);
 //  ierr = MatDestroy (&B);
 //  CHKERRQ (ierr);
-  //  ierr = VecDestroy(&B);CHKERRQ(ierr);
-  //  ierr = VecDestroy(&X);CHKERRQ(ierr);
-  //  ierr = VecDestroy(&D);CHKERRQ(ierr);
+//  ierr = VecDestroy(&B);CHKERRQ(ierr);
+//  ierr = VecDestroy(&X);CHKERRQ(ierr);
+//  ierr = VecDestroy(&D);CHKERRQ(ierr);
 
-  ierr = PetscFinalize ();
-  return ierr;
+ierr = PetscFinalize ();
+return ierr;
 }
