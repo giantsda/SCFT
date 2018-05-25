@@ -1,36 +1,73 @@
 #include <stdio.h>
 #include <petscksp.h>
+#include <petscdm.h>
+#include <petscdmda.h>
+#include <petscsnes.h>
+#include <stdlib.h>
+#include <math.h>
+#include "nr.h"
+#include "nrutil.h"
+#include <time.h>
+
+int N = 33;
+
+double* f0_given;
+
+void
+myfun (int n, double *x, double *xnew);
+double*
+adm (double *x, int n, int *check, int
+(*myfun) (int, double *x, double *xnew),
+     int flag);
+
+double **
+Matcreate (int r, int c)
+{
+  double** A = (double **) malloc (sizeof(double *) * r);
+  A[0] = (double *) malloc (sizeof(double) * c * r);
+  for (int i = 0; i < r; i++)
+    A[i] = (*A + c * i);
+  return A;
+}
+
+void
+Matfree (double** A, int r, int c)
+{
+  free (A[0]);
+  free (A);
+}
 
 int
-main ()
+simple_FEM_1D_transient (int NN, double* yita_middle, double * out)
 {
+  // N is the total number of nodes in 1D problem.
   KSP ksp;
   PC pc;
   Mat A, B, C, D;
-  Vec X, b, xold, x_initial;
+  Vec X, b, xold;
   MPI_Comm comm;
-  //  PetscScalar        v;
-  //  KSPConvergedReason reason;
-  //  PetscInt           i,j,its;
   PetscErrorCode ierr;
 
-  //  PetscFunctionBegin;
-  ierr = PetscInitialize (NULL, NULL, 0, NULL);
   if (ierr)
     return ierr;
   comm = MPI_COMM_SELF;
-  printf ("Hello");
-  int N = 8; // N is the total number of nodes in 1D problem.
-  double L = 1.9, tau = 0.4, dt = 0.01, t = 0, h = L / (N - 1); // L is the length of the space domain
-  int i;
-  int time_step = 7;
-  double yita[N];
-  double solution_store[N + 1][time_step];
-  for (int i = 0; i < N; i++)
+  int time_step = 2048;
+  double L = 3.72374, dt = 1. / (time_step - 1), t = 0, h = L / (N - 1); // L is the length of the space domain
+  double solution[N], yita[N], f0[N];
+  int de;
+  // add two fixed point of yita
+  yita[0] = 0.;
+  yita[N] = 0.;
+  for (int i = 1; i < N - 1; i++)
     {
-      yita[i] = 1.;
+      yita[i] = yita_middle[i - 1];
     }
+//  for (int i = 0; i < N; i++)
+//    printf ("%f\n", yita[i]);
+//  scanf ("%d", &de);
 
+  PetscInt ix[N];
+  double** solution_store = Matcreate (N + 1, time_step + 1);
   ierr = MatCreateSeqAIJ (comm, N, N, 3, NULL, &A);
   ierr = MatCreateSeqAIJ (comm, N, N, 3, NULL, &B);
   ierr = MatCreateSeqAIJ (comm, N, N, 3, NULL, &C);
@@ -41,21 +78,18 @@ main ()
   CHKERRQ(ierr);
   ierr = VecDuplicate (b, &xold);
   CHKERRQ(ierr);
-  ierr = VecDuplicate (b, &x_initial);
-  CHKERRQ(ierr);
 
-  double vforA[3] =
+  PetscScalar vforA[3] =
     { h / 6, 2. / 3 * h, h / 6 };
-  double vforB[3] =
+  PetscScalar vforB[3] =
     { -1 / h, 2. / h, -1 / h };
 
-  for (int i = 0; i < N; i++)
+  for (PetscInt i = 0; i < N; i++)
     {
-      int column_number[3] =
+      PetscInt column_number[3] =
 	{ i - 1, i, i + 1 };
-      double vforC[3] =
+      PetscScalar vforC[3] =
 	{ h / 6 * yita[i], 2. / 3 * h * yita[i], h / 6 * yita[i] };
-      printf ("i=%d\n", i);
       if (i == 0)
 	{
 	  MatSetValues (A, 1, &i, 2, &column_number[1], &vforA[1],
@@ -64,25 +98,32 @@ main ()
 			INSERT_VALUES);
 	  MatSetValues (C, 1, &i, 2, &column_number[1], &vforC[1],
 			INSERT_VALUES);
-	  VecSetValue (xold, i, 1., INSERT_VALUES);
+	  VecSetValue (xold, i, 0., INSERT_VALUES);
 	}
       else if (i == N - 1)
 	{
-	  MatSetValues (A, 1, &i, 2, &column_number, &vforA, INSERT_VALUES);
-	  MatSetValues (B, 1, &i, 2, &column_number, &vforB, INSERT_VALUES);
-	  MatSetValues (C, 1, &i, 2, &column_number, &vforC, INSERT_VALUES);
-	  VecSetValue (xold, i, 1., INSERT_VALUES);
+	  MatSetValues (A, 1, &i, 2, column_number, vforA, INSERT_VALUES);
+	  MatSetValues (B, 1, &i, 2, column_number, vforB, INSERT_VALUES);
+	  MatSetValues (C, 1, &i, 2, column_number, vforC, INSERT_VALUES);
+	  VecSetValue (xold, i, 0., INSERT_VALUES);
 	}
       else
 	{
-	  MatSetValues (A, 1, &i, 3, &column_number, &vforA, INSERT_VALUES);
-	  MatSetValues (B, 1, &i, 3, &column_number, &vforB, INSERT_VALUES);
-	  MatSetValues (C, 1, &i, 3, &column_number, &vforC, INSERT_VALUES);
-	  VecSetValue (xold, i, 0., INSERT_VALUES);
+	  MatSetValues (A, 1, &i, 3, column_number, vforA, INSERT_VALUES);
+	  MatSetValues (B, 1, &i, 3, column_number, vforB, INSERT_VALUES);
+	  MatSetValues (C, 1, &i, 3, column_number, vforC, INSERT_VALUES);
+	  VecSetValue (xold, i, 1., INSERT_VALUES);
 	}
     }
-  VecCopy (xold,x_initial);
 
+  for (PetscInt i = 0; i < N; i++)
+    ix[i] = i;
+  ierr = VecGetValues (xold, N, ix, solution);
+  CHKERRQ(ierr);
+
+  solution_store[0][0] = 0;
+  for (int i = 1; i < N; i++)
+    solution_store[i + 1][0] = solution[i];
 
   ierr = MatAssemblyBegin (A, MAT_FINAL_ASSEMBLY);
   CHKERRQ(ierr);
@@ -102,143 +143,79 @@ main ()
   CHKERRQ(ierr);
   MatDuplicate (A, MAT_COPY_VALUES, &D);
 
-  printf ("A:\n");
-  ierr = MatView (A, PETSC_VIEWER_STDOUT_WORLD);
+//  printf ("A:\n");
+//  ierr = MatView (A, PETSC_VIEWER_STDOUT_WORLD);
+//  CHKERRQ (ierr);
+//  printf ("B:\n");
+//  ierr = MatView (B, PETSC_VIEWER_STDOUT_WORLD);
+//  CHKERRQ (ierr);
+//  printf ("C:\n");
+//  ierr = MatView (C, PETSC_VIEWER_STDOUT_WORLD);
+//  CHKERRQ (ierr);
+//  printf ("D:\n");
+//  ierr = MatView (D, PETSC_VIEWER_STDOUT_WORLD);
+//  CHKERRQ (ierr);
+//  printf ("xold:\n");
+//  ierr = VecView (xold, 0);
+//  CHKERRQ (ierr);
+
+  // TODO: change this to a better time marching method.
+
+  ierr = MatAXPY (D, dt, B, SAME_NONZERO_PATTERN);  // A=A+dt*B
+  ierr = MatAXPY (D, dt, C, SAME_NONZERO_PATTERN);  // A=A+dt*C
+  ierr = MatSetValue (D, 0, 0, 1.0, INSERT_VALUES);
+  ierr = MatSetValue (D, 0, 1, 0.0, INSERT_VALUES);
+  ierr = MatSetValue (D, N - 1, N - 1 - 1, 0.0, INSERT_VALUES);
+  ierr = MatSetValue (D, N - 1, N - 1, 1.0, INSERT_VALUES);
+  ierr = MatAssemblyBegin (D, MAT_FINAL_ASSEMBLY);
   CHKERRQ(ierr);
-  printf ("B:\n");
-  ierr = MatView (B, PETSC_VIEWER_STDOUT_WORLD);
-  CHKERRQ(ierr);
-  printf ("C:\n");
-  ierr = MatView (C, PETSC_VIEWER_STDOUT_WORLD);
-  CHKERRQ(ierr);
-  printf ("D:\n");
-  ierr = MatView (D, PETSC_VIEWER_STDOUT_WORLD);
-  CHKERRQ(ierr);
-  printf ("xold:\n");
-  ierr = VecView (xold, 0);
+  ierr = MatAssemblyEnd (D, MAT_FINAL_ASSEMBLY);
   CHKERRQ(ierr);
 
-for (i=0;i<=time_step;i++)
-  {
-    t=t+dt;
+//  printf ("D:\n");
+//  ierr = MatView (D, PETSC_VIEWER_STDOUT_WORLD);
 
+  ierr = KSPCreate (comm, &ksp);
+  CHKERRQ(ierr);
+  ierr = KSPSetOperators (ksp, D, D);
+  CHKERRQ(ierr);
+  ierr = KSPSetType (ksp, KSPCG);
+  CHKERRQ(ierr);
+  ierr = KSPSetInitialGuessNonzero (ksp, PETSC_TRUE);
+  CHKERRQ(ierr);
+  ierr = KSPGetPC (ksp, &pc);
+  CHKERRQ(ierr);
+  ierr = PCSetType (pc, PCICC);
+  CHKERRQ(ierr);
+  ierr = KSPSetFromOptions (ksp);
+  CHKERRQ(ierr);
+  ierr = KSPSetUp (ksp);
+  CHKERRQ(ierr);
 
+  for (int i = 1; i < time_step + 1; i++)
+    {
+      t = t + dt;
+//      printf ("time step:%d ; t= %f \n", i, t);
+      ierr = MatMult (A, xold, b);  // b=A*xold;
+      ierr = VecSetValue (b, 0, 0., INSERT_VALUES);
+      ierr = VecSetValue (b, N - 1, 0., INSERT_VALUES);
+      ierr = KSPSolve (ksp, b, X);
+      VecAssemblyBegin (X);
+      VecAssemblyEnd (X);
+      CHKERRQ(ierr);
+      ierr = VecGetValues (X, N, ix, solution);
+      CHKERRQ(ierr);
+      // store X to solution_store
+      for (int j = 0; j < N; j++)
+	{
+	  solution_store[0][i] = t;
+	  solution_store[j + 1][i] = solution[j];
+	}
+      VecCopy (X, xold);
+    }
 
-
-
-
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//  ierr = VecView (B, 0);
-//  CHKERRQ (ierr);
-
-//  ierr = KSPCreate (comm, &ksp);
-//  CHKERRQ (ierr);
-//  ierr = KSPSetOperators (ksp, A, A);
-//  CHKERRQ (ierr);
-//  ierr = KSPSetType (ksp, KSPCG);
-//  CHKERRQ (ierr);
-//  ierr = KSPSetInitialGuessNonzero (ksp, PETSC_TRUE);
-//  CHKERRQ (ierr);
-//  ierr = KSPGetPC (ksp, &pc);
-//  CHKERRQ (ierr);
-//  ierr = PCSetType (pc, PCICC);
-//  CHKERRQ (ierr);
-//  ierr = KSPSetFromOptions (ksp);
-//  CHKERRQ (ierr);
-//  ierr = KSPSetUp (ksp);
-//  CHKERRQ (ierr);
-//  ierr = KSPSolve (ksp, B, X);
-//  CHKERRQ (ierr);
-//  ierr = VecView (X, 0);
-//  CHKERRQ (ierr);
-
-  //  for (i=0; i<4; i++) {
-  //    v    = 3;
-  //    ierr = MatSetValues(A,1,&i,1,&i,&v,INSERT_VALUES);CHKERRQ(ierr);
-  //    v    = 1;
-  //    ierr = VecSetValues(B,1,&i,&v,INSERT_VALUES);CHKERRQ(ierr);
-  //    ierr = VecSetValues(X,1,&i,&v,INSERT_VALUES);CHKERRQ(ierr);
-  //  }
-  //
-  //  i    =0; v=0;
-  //  ierr = VecSetValues(X,1,&i,&v,INSERT_VALUES);CHKERRQ(ierr);
-  //
-  //  for (i=0; i<3; i++) {
-  //    v    = -2; j=i+1;
-  //    ierr = MatSetValues(A,1,&i,1,&j,&v,INSERT_VALUES);CHKERRQ(ierr);
-  //    ierr = MatSetValues(A,1,&j,1,&i,&v,INSERT_VALUES);CHKERRQ(ierr);
-  //  }
-  //  i=0; j=3; v=2;
-  //
-  //  ierr = MatSetValues(A,1,&i,1,&j,&v,INSERT_VALUES);CHKERRQ(ierr);
-  //  ierr = MatSetValues(A,1,&j,1,&i,&v,INSERT_VALUES);CHKERRQ(ierr);
-  //  ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  //  ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  //  ierr = VecAssemblyBegin(B);CHKERRQ(ierr);
-  //  ierr = VecAssemblyEnd(B);CHKERRQ(ierr);
-  //  ierr = PetscPrintf(PETSC_COMM_WORLD,"\nThe Kershaw matrix:\n\n");CHKERRQ(ierr);
-  //  ierr = MatView(A,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
-  //
-  //
-  //  ierr = KSPCreate(comm,&ksp);CHKERRQ(ierr);
-  //  ierr = KSPSetOperators(ksp,A,A);CHKERRQ(ierr);
-  //
-  //  ierr = KSPSetType(ksp,KSPCG);CHKERRQ(ierr);
-  //  ierr = KSPSetInitialGuessNonzero(ksp,PETSC_TRUE);CHKERRQ(ierr);
-  //
-  //  ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
-  //  ierr = PCSetType(pc,PCICC);CHKERRQ(ierr);
-  //  /* ierr = PCFactorSetShiftType(prec,MAT_SHIFT_POSITIVE_DEFINITE);CHKERRQ(ierr); */
-  //
-  //  ierr = KSPSetFromOptions(ksp);CHKERRQ(ierr);
-  //  ierr = KSPSetUp(ksp);CHKERRQ(ierr);
-  //
-  //  ierr = PCFactorGetMatrix(pc,&M);CHKERRQ(ierr);
-  //  ierr = VecDuplicate(B,&D);CHKERRQ(ierr);
-  //  ierr = MatGetDiagonal(M,D);CHKERRQ(ierr);
-  //  ierr = PetscPrintf(PETSC_COMM_WORLD,"\nPivots:\n\n");CHKERRQ(ierr);
-  //  ierr = VecView(D,0);CHKERRQ(ierr);
-  //
-  //
-  //  ierr = KSPSolve(ksp,B,X);CHKERRQ(ierr);
-  //  ierr = KSPGetConvergedReason(ksp,&reason);CHKERRQ(ierr);
-  //  if (reason==KSP_DIVERGED_INDEFINITE_PC) {
-  //    ierr = PetscPrintf(PETSC_COMM_WORLD,"\nDivergence because of indefinite preconditioner;\n");CHKERRQ(ierr);
-  //    ierr = PetscPrintf(PETSC_COMM_WORLD,"Run the executable again but with -pc_factor_shift_positive_definite option.\n");CHKERRQ(ierr);
-  //  } else if (reason<0) {
-  //    ierr = PetscPrintf(PETSC_COMM_WORLD,"\nOther kind of divergence: this should not happen.\n");CHKERRQ(ierr);
-  //  } else {
-  //    ierr = KSPGetIterationNumber(ksp,&its);CHKERRQ(ierr);
-  //    ierr = PetscPrintf(PETSC_COMM_WORLD,"\nConvergence in %d iterations.\n",(int)its);CHKERRQ(ierr);
-  //  }
-  //  ierr = PetscPrintf(PETSC_COMM_WORLD,"\n");CHKERRQ(ierr);
-  //
-  //  ierr = KSPDestroy(&ksp);CHKERRQ(ierr);
+  ierr = KSPDestroy (&ksp);
+  CHKERRQ(ierr);
   ierr = MatDestroy (&A);
   CHKERRQ(ierr);
   ierr = MatDestroy (&B);
@@ -247,12 +224,168 @@ for (i=0;i<=time_step;i++)
   CHKERRQ(ierr);
   ierr = MatDestroy (&D);
   CHKERRQ(ierr);
-//  ierr = MatDestroy (&B);
-//  CHKERRQ (ierr);
-  //  ierr = VecDestroy(&B);CHKERRQ(ierr);
-  //  ierr = VecDestroy(&X);CHKERRQ(ierr);
-  //  ierr = VecDestroy(&D);CHKERRQ(ierr);
+  ierr = VecDestroy (&b);
+  CHKERRQ(ierr);
+  ierr = VecDestroy (&X);
+  CHKERRQ(ierr);
+  ierr = VecDestroy (&xold);
+  CHKERRQ(ierr);
 
-  ierr = PetscFinalize ();
+////   Plot results
+//  printf ("solution_store: \n");
+//  for (int i = 0; i < N + 1; i++)
+//    {
+//      for (int j = 0; j < time_step + 1; j++)
+//	printf ("%f, ", solution_store[i][j]);
+//      printf ("\n");
+//    }
+
+//   integrate for f0
+//   TODO:change this to better integration method
+
+  printf ("f0: \n");
+  for (int i = 0; i < N; i++)
+    {
+      f0[i] = 0.0;
+      for (int j = 0; j < time_step; j++)
+	{
+	  double value_left = solution_store[i + 1][j]
+	      * solution_store[i + 1][time_step - j];
+	  double value_right = solution_store[i + 1][j + 1]
+	      * solution_store[i + 1][time_step - j - 1];
+	  f0[i] = f0[i] + 0.5 * dt * (value_left + value_right);
+	}
+      printf ("%f \n", f0[i]);
+    }
+
+  for (int i = 0; i < N - 2; i++)
+    {
+      out[i] = f0[i + 1] - f0_given[i + 1] + yita_middle[i];
+    }
+  printf ("out: 			yita_middle:   \n");
+  for (int i = 0; i < N - 2; i++)
+    {
+      printf ("%f      			%f \n", out[i], yita_middle[i]);
+    }
+
+  printf ("f0_given: \n");
+  for (int i = 0; i < N; i++)
+    {
+      printf ("%f \n", f0_given[i]);
+    }
+  printf ("have a nice day! \n");
+
+  fflush (stdout);
   return ierr;
+}
+
+int
+main ()
+{
+  f0_given = malloc (N * sizeof(double));
+  PetscInitialize (NULL, NULL, 0, NULL);
+  double yita_middle[N - 2]; // initial guess, the ends are bounded
+  for (int i = 0; i < N - 2; i++)
+    {
+      yita_middle[i] = 1;
+    }
+  double out[N - 2]; // results
+  // calculate f0_given so that I can use andmix
+  double tau = 0.5302;
+
+  double x[N];
+  for (int i = 0; i < N; i++)
+    {
+      f0_given[i] = 1.;
+      x[i] = i * 1. / (N - 1);
+    }
+  int x_left = ceil (N * tau / 1.);
+  for (int i = 0; i < x_left; i++)
+    {
+      f0_given[i] = pow ((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) - 1),
+			 2)
+	  / pow (((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) + 1)), 2);
+      f0_given[N - i - 1] = f0_given[i];
+    }
+
+// read data from file:
+  FILE *file;
+  file = fopen ("Exp_m32_n2048_IE.res", "r");
+  if (file == NULL)
+    {
+      fprintf (stderr, "Can't open input file in.list!\n");
+      return 1;
+    }
+  char buff[255];
+  int line = 0;
+  double c, d;
+  for (int i = 0; i < 10; i++)
+    fgets (buff, 255, (FILE*) file);
+  while (fgets (buff, 255, (FILE*) file))
+    {
+      sscanf (buff, "%lf %lf %lf %lf %lf", &c, &c, &d, &c, &c);
+      yita_middle[line] = d;
+      line++;
+      if (line == N - 2)
+	break;
+    }
+  fclose (file);
+
+  for (int i = 0; i < N - 2; i++)
+    {
+      printf ("%f \n", yita_middle[i]);
+    }
+
+//  // random number
+//  for (int j = 0; j <= 2000; j++)
+//    {
+//      srand (time (NULL));   // should only be called once
+//      for (int i = 0; i <= N - 2; i++)
+//	{
+//	  double r = (rand () % 100000) / 100.0;
+//	  printf ("%f    %d \n", r,j);
+//	  yita_middle[i] = r;
+//	}
+//
+//      simple_FEM_1D_transient (N, yita_middle, out);
+//      printf ("out: \n");
+//      for (int i = 0; i < N - 2; i++)
+//	{
+//	  printf (">>%f    %d\n ", out[i],j);
+//	}
+//    }
+//  return 0;
+
+  int check = 1;
+//  double* haha = adm (yita_middle, N - 2, &check, simple_FEM_1D_transient, 0);
+
+//    for (int i = 0; i < N-2; i++)
+//      printf (">>>>%f \n", haha[i]);
+
+
+
+
+//    broydn(yita_middle,N-2, &check, simple_FEM_1D_transient);
+
+  double haha2[]={1,2};
+  broydn(haha2,2, &check, myfun);
+
+  free (f0_given);
+  PetscFinalize ();
+//  double in[2] =
+//    { 0, 0 };
+//  int check = 1;
+//
+//  double * haha = adm (in, 2, &check, myfun, 0);
+
+  return 0;
+
+}
+
+void
+myfun (int n, double * x, double * xnew)
+{
+  xnew[0] = x[1] * 0.5 - 2;
+  xnew[1] = x[0] + 3;
+  printf ("x=%.14f, xnew=%.14f \n", *x, *xnew);
 }
