@@ -42,7 +42,7 @@ else
             end
             Xr(j) = Xr(j) - dlt;
         end
- output2d (B0, '%.14e');
+%  output2d (B0, '%.14e');
         [B1] = inverse (B0, 1e-14);
 %         if err,  exit,  end
     end
@@ -85,4 +85,7 @@ while (found==0 && iter<=imax)
         break;
     end
     Y = Yn;
+%     pause()
 end
+
+iiii=11
