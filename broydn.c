@@ -19,12 +19,12 @@ float *fvec;
 void (*funcvbrd)(int n, float v[], float f[]);
 
 /* The following must be defined in the calling program */
- double **qt, **r, *d,	/* qt[1:n,1:n], r[1:n,1:n] and d[1:n] must be allocated in the calling program */
+extern double **qt, **r, *d,	/* qt[1:n,1:n], r[1:n,1:n] and d[1:n] must be allocated in the calling program */
 			  err;				/* Passed in as the convergence criterion, and returned with the actual residual error */
- int funcerr,			/* Flag for error in evaluating the function in Broyden method */
+extern int funcerr,			/* Flag for error in evaluating the function in Broyden method */
 		   jc;				/* For re-use of Jacobian. jc denotes the status of Jacobian calculation: 0 for not calculated,
                     	   	   1 for previously calculated, 2 for currently calculated */
- int PRINT;
+extern int PRINT;
 
 
 
@@ -170,7 +170,7 @@ PRINT = 0;
 		err=0.0;
 		for (i=1;i<=n;i++)
 			if (fabs(fvec[i]) > err) err=fabs(fvec[i]);
-		if (its%10 == 0)  printf ("   Broydn %d: |f|max = %e\n", its, err);
+		if (its%1 == 0)  printf ("   Broydn %d: |f|max = %e\n", its, err);
 		if (err < TOLF)
 		{
 			printf ("   Broydn %d: |f|max = %e\n", its, err);

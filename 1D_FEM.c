@@ -13,6 +13,13 @@ int N = 33;
 
 double* f0_given;
 
+double **qt, **r, *d, /* qt[1:n,1:n], r[1:n,1:n] and d[1:n] must be allocated in the calling program */
+err; /* Passed in as the convergence criterion, and returned with the actual residual error */
+int funcerr, /* Flag for error in evaluating the function in Broyden method */
+jc; /* For re-use of Jacobian. jc denotes the status of Jacobian calculation: 0 for not calculated,
+ 1 for previously calculated, 2 for currently calculated */
+int PRINT;
+
 void
 myfun (int n, double *x, double *xnew);
 double*
@@ -48,8 +55,6 @@ simple_FEM_1D_transient (int NN, double* yita_middle, double * out)
   MPI_Comm comm;
   PetscErrorCode ierr;
 
-  if (ierr)
-    return ierr;
   comm = MPI_COMM_SELF;
   int time_step = 2048;
   double L = 3.72374, dt = 1. / (time_step - 1), t = 0, h = L / (N - 1); // L is the length of the space domain
@@ -58,10 +63,17 @@ simple_FEM_1D_transient (int NN, double* yita_middle, double * out)
   // add two fixed point of yita
   yita[0] = 0.;
   yita[N] = 0.;
+
+//  for (int i = 1; i < N - 1; i++)
+//    {
+//      yita[i] = yita_middle[i - 1];
+//    }
+
   for (int i = 1; i < N - 1; i++)
     {
-      yita[i] = yita_middle[i - 1];
+      yita[i] = yita_middle[i];   // Using NR function because NR is 1 based!
     }
+
 //  for (int i = 0; i < N; i++)
 //    printf ("%f\n", yita[i]);
 //  scanf ("%d", &de);
@@ -243,7 +255,7 @@ simple_FEM_1D_transient (int NN, double* yita_middle, double * out)
 //   integrate for f0
 //   TODO:change this to better integration method
 
-  printf ("f0: \n");
+//  printf ("f0: \n");
   for (int i = 0; i < N; i++)
     {
       f0[i] = 0.0;
@@ -255,25 +267,32 @@ simple_FEM_1D_transient (int NN, double* yita_middle, double * out)
 	      * solution_store[i + 1][time_step - j - 1];
 	  f0[i] = f0[i] + 0.5 * dt * (value_left + value_right);
 	}
-      printf ("%f \n", f0[i]);
+//      printf ("%f \n", f0[i]);
     }
 
-  for (int i = 0; i < N - 2; i++)
-    {
-      out[i] = f0[i + 1] - f0_given[i + 1] + yita_middle[i];
-    }
-  printf ("out: 			yita_middle:   \n");
-  for (int i = 0; i < N - 2; i++)
-    {
-      printf ("%f      			%f \n", out[i], yita_middle[i]);
-    }
+//  for (int i = 0; i < N - 2; i++)
+//    {
+//      out[i] = f0[i + 1] - f0_given[i + 1]+ yita_middle[i];
+//    }
 
-  printf ("f0_given: \n");
-  for (int i = 0; i < N; i++)
+  for (int i = 1; i <= N - 2; i++)
     {
-      printf ("%f \n", f0_given[i]);
+      out[i] = f0[i] - f0_given[i];
     }
-  printf ("have a nice day! \n");
+// NR is 1 based.
+
+//  printf ("out: 			yita_middle:   \n");
+//  for (int i = 0; i < N - 2; i++)
+//    {
+//      printf ("%f      			%f \n", out[i], yita_middle[i]);
+//    }
+
+//  printf ("f0_given: \n");
+//  for (int i = 0; i < N; i++)
+//    {
+//      printf ("%f \n", f0_given[i]);
+//    }
+//  printf ("have a nice day! \n");
 
   fflush (stdout);
   return ierr;
@@ -291,15 +310,16 @@ main ()
     }
   double out[N - 2]; // results
   // calculate f0_given so that I can use andmix
-  double tau = 0.5302;
+  double tau = 0.5302,L=3.72374;
 
   double x[N];
+
   for (int i = 0; i < N; i++)
     {
       f0_given[i] = 1.;
-      x[i] = i * 1. / (N - 1);
+      x[i] = i * L / (N - 1);
     }
-  int x_left = ceil (N * tau / 1.);
+  int x_left = ceil (N * tau / L);
   for (int i = 0; i < x_left; i++)
     {
       f0_given[i] = pow ((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) - 1),
@@ -308,6 +328,10 @@ main ()
       f0_given[N - i - 1] = f0_given[i];
     }
 
+printf("f0_given\n");
+  for (int i=0;i<N;i++)
+printf("%f \n", f0_given[i]);
+  printf("\n");
 // read data from file:
   FILE *file;
   file = fopen ("Exp_m32_n2048_IE.res", "r");
@@ -318,13 +342,13 @@ main ()
     }
   char buff[255];
   int line = 0;
-  double c, d;
+  double c, e;
   for (int i = 0; i < 10; i++)
     fgets (buff, 255, (FILE*) file);
   while (fgets (buff, 255, (FILE*) file))
     {
-      sscanf (buff, "%lf %lf %lf %lf %lf", &c, &c, &d, &c, &c);
-      yita_middle[line] = d;
+      sscanf (buff, "%lf %lf %lf %lf %lf", &c, &c, &e, &c, &c);
+      yita_middle[line] = e*0.;
       line++;
       if (line == N - 2)
 	break;
@@ -358,17 +382,25 @@ main ()
 
   int check = 1;
 //  double* haha = adm (yita_middle, N - 2, &check, simple_FEM_1D_transient, 0);
-
 //    for (int i = 0; i < N-2; i++)
 //      printf (">>>>%f \n", haha[i]);
 
-
-
-
 //    broydn(yita_middle,N-2, &check, simple_FEM_1D_transient);
 
-  double haha2[]={1,2};
-  broydn(haha2,2, &check, myfun);
+  qt = dmatrix (1, N - 2, 1, N - 2);
+  r = dmatrix (1, N - 2, 1, N - 2);
+  d = dvector (1, N - 2);
+  jc = 0;
+  err = 0.00000001;
+
+  double* x_nr = dvector (1, N - 2);
+  for (int i = 1; i <= N - 2; i++)
+    x_nr[i] = yita_middle[i - 1];
+
+  broydn (x_nr, N - 2, &check, simple_FEM_1D_transient);
+//  broydn (x_nr, 2, &check, myfun);
+  for (int i = 1; i <= N - 2; i++)
+    printf (">>>>%f \n", x_nr[i]);
 
   free (f0_given);
   PetscFinalize ();
@@ -385,7 +417,9 @@ main ()
 void
 myfun (int n, double * x, double * xnew)
 {
-  xnew[0] = x[1] * 0.5 - 2;
-  xnew[1] = x[0] + 3;
-  printf ("x=%.14f, xnew=%.14f \n", *x, *xnew);
+  xnew[1] = x[1] * 0.5 - 2.;
+  xnew[2] = x[2] * 0.5 + 3.;
+//  printf ("x[1]=%.14f,x[2]=%.14f, xnew[1]=%.14f xnew[2]=%.14f \n", x[1], x[2],
+//	  xnew[1], xnew[2]);
 }
+
