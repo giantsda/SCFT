@@ -310,7 +310,7 @@ main ()
     }
   double out[N - 2]; // results
   // calculate f0_given so that I can use andmix
-  double tau = 0.5302,L=3.72374;
+  double tau = 0.5302, L = 3.72374;
 
   double x[N];
 
@@ -328,10 +328,10 @@ main ()
       f0_given[N - i - 1] = f0_given[i];
     }
 
-printf("f0_given\n");
-  for (int i=0;i<N;i++)
-printf("%f \n", f0_given[i]);
-  printf("\n");
+  printf ("f0_given\n");
+  for (int i = 0; i < N; i++)
+    printf ("%f \n", f0_given[i]);
+  printf ("\n");
 // read data from file:
   FILE *file;
   file = fopen ("Exp_m32_n2048_IE.res", "r");
@@ -348,7 +348,7 @@ printf("%f \n", f0_given[i]);
   while (fgets (buff, 255, (FILE*) file))
     {
       sscanf (buff, "%lf %lf %lf %lf %lf", &c, &c, &e, &c, &c);
-      yita_middle[line] = e*0.;
+      yita_middle[line] = e * 0.;
       line++;
       if (line == N - 2)
 	break;
