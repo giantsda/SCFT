@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 1999 - 2016 by the deal.II authors
+ * Copyright (C) 2013 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -14,248 +14,309 @@
  * ---------------------------------------------------------------------
 
  *
- * Authors: Wolfgang Bangerth, 1999,
- *          Guido Kanschat, 2011
+ * Author: Wolfgang Bangerth, Texas A&M University, 2013
  */
 
-#include <deal.II/grid/tria.h>
-#include <deal.II/dofs/dof_handler.h>
-#include <deal.II/grid/grid_generator.h>
-
-#include <deal.II/grid/tria_accessor.h>
-#include <deal.II/grid/tria_iterator.h>
-#include <deal.II/dofs/dof_accessor.h>
-
-#include <deal.II/fe/fe_q.h>
-
-#include <deal.II/dofs/dof_tools.h>
-
-#include <deal.II/fe/fe_values.h>
+#include <deal.II/base/utilities.h>
 #include <deal.II/base/quadrature_lib.h>
-
 #include <deal.II/base/function.h>
-#include <deal.II/numerics/vector_tools.h>
-#include <deal.II/numerics/matrix_tools.h>
-
+#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
-#include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
+#include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/precondition.h>
-#include <deal.II/grid/grid_tools.h>
-
+#include <deal.II/lac/constraint_matrix.h>
+#include <deal.II/grid/tria.h>
+#include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/grid_refinement.h>
 #include <deal.II/grid/grid_out.h>
+#include <deal.II/grid/tria_accessor.h>
+#include <deal.II/grid/tria_iterator.h>
+#include <deal.II/grid/grid_tools.h>
+#include <deal.II/dofs/dof_handler.h>
+#include <deal.II/dofs/dof_accessor.h>
+#include <deal.II/dofs/dof_tools.h>
+#include <deal.II/fe/fe_q.h>
+#include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/data_out.h>
+#include <deal.II/numerics/vector_tools.h>
+#include <deal.II/numerics/error_estimator.h>
+#include <deal.II/numerics/solution_transfer.h>
+#include <deal.II/numerics/matrix_tools.h>
+
 #include <fstream>
 #include <iostream>
 
-using namespace dealii;
-
-class Step3
+double **
+Matcreate (int r, int c)
 {
-public:
-  Step3 ();
-
-  void
-  run ();
-
-private:
-  void
-  make_grid ();
-  void
-  setup_system ();
-  void
-  assemble_system ();
-  void
-  solve ();
-  void
-  output_results () const;
-
-  Triangulation<2> triangulation;
-  FE_Q<2> fe;
-  DoFHandler<2> dof_handler;
-
-  SparsityPattern sparsity_pattern;
-  SparseMatrix<double> system_matrix;
-
-  Vector<double> solution;
-  Vector<double> system_rhs;
-};
-
-Step3::Step3 () :
-    fe (1), dof_handler (triangulation)
-{
+  double** A = (double **) malloc (sizeof(double *) * r);
+  A[0] = (double *) malloc (sizeof(double) * c * r);
+  for (int i = 0; i < r; i++)
+    A[i] = (*A + c * i);
+  return A;
 }
 
 void
-Step3::make_grid ()
+Matfree (double** A)
 {
-//  GridGenerator::hyper_cube (triangulation, -1, 1);
-//  triangulation.refine_global (5);
-//  GridGenerator::subdivided_hyper_cube (triangulation, 2, 0., 1.);
-  std::vector<unsigned int> repetitions;
-  repetitions.push_back (3000);
-  repetitions.push_back (1);
-  GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,
-					     Point<2> (0.0, 0.0),
-					     Point<2> (1.0, 0.1), true);
-
-  std::cout << "Number of active cells: " << triangulation.n_active_cells ()
-      << std::endl;
-
-  typename DoFHandler<2>::active_cell_iterator cell =
-      dof_handler.begin_active (), endc = dof_handler.end ();
-
-//  int ii = 1;
-//  for (; cell != endc; ++cell)
-//    {
-//      printf ("cell: %d \n", ii);
-//      ii++;
-//      for (unsigned int face = 0; face < GeometryInfo<2>::faces_per_cell;
-//	  ++face)
-//	{
-//	  printf ("face: %d\n", face);
-//	  for (unsigned int cornor = 0;
-//	      cornor < GeometryInfo<2>::vertices_per_face; cornor++)
-//	    {
-//	      std::cout << (cell->face (face)->vertex (cornor)) << std::endl;
-//	    }
-//	  std::cout << static_cast<int> (cell->face (face)->boundary_id ())
-//	      << std::endl;
-//	}
-//    }
-
-  std::ofstream out ("grid-1.vtk");
-  GridOut grid_out;
-  grid_out.write_vtk (triangulation, out);
-  std::cout << "Grid written to grid-1.vtk" << std::endl;
-
-  std::vector<
-      GridTools::PeriodicFacePair<typename Triangulation<2>::cell_iterator> > periodicity_vector;
-
-  GridTools::collect_periodic_faces (triangulation, 2, 3, 1,
-				     periodicity_vector);
-  triangulation.add_periodicity (periodicity_vector);
-
+  free (A[0]);
+  free (A);
 }
 
-void
-Step3::setup_system ()
+namespace Step26
 {
-  dof_handler.distribute_dofs (fe);
-  std::cout << "Number of degrees of freedom: " << dof_handler.n_dofs ()
-      << std::endl;
+  using namespace dealii;
 
-  DynamicSparsityPattern dsp (dof_handler.n_dofs ());
-  DoFTools::make_sparsity_pattern (dof_handler, dsp);
-  sparsity_pattern.copy_from (dsp);
-
-  system_matrix.reinit (sparsity_pattern);
-
-  solution.reinit (dof_handler.n_dofs ());
-  system_rhs.reinit (dof_handler.n_dofs ());
-}
-
-void
-Step3::assemble_system ()
-{
-  QGauss<2> quadrature_formula (2);
-  FEValues<2> fe_values (fe, quadrature_formula,
-			 update_values | update_gradients | update_JxW_values);
-
-  const unsigned int dofs_per_cell = fe.dofs_per_cell;
-  const unsigned int n_q_points = quadrature_formula.size ();
-
-  FullMatrix<double> cell_matrix (dofs_per_cell, dofs_per_cell);
-  Vector<double> cell_rhs (dofs_per_cell);
-
-  std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
-
-  DoFHandler<2>::active_cell_iterator cell = dof_handler.begin_active ();
-  DoFHandler<2>::active_cell_iterator endc = dof_handler.end ();
-  for (; cell != endc; ++cell)
+  template<int dim>
+    class HeatEquation
     {
-      fe_values.reinit (cell);
+    public:
+      HeatEquation (int N, int total_time_step);
+      void
+      run ();
 
-      cell_matrix = 0;
-      cell_rhs = 0;
+    private:
+      void
+      setup_system ();
+      void
+      solve_time_step ();
+      void
+      output_results () const;
+      void
+      refine_mesh (const unsigned int min_grid_level,
+		   const unsigned int max_grid_level);
 
-      for (unsigned int q_index = 0; q_index < n_q_points; ++q_index)
-	{
-	  for (unsigned int i = 0; i < dofs_per_cell; ++i)
-	    for (unsigned int j = 0; j < dofs_per_cell; ++j)
-	      cell_matrix (i, j) +=
-		  (fe_values.shape_grad (i, q_index)
-		      * fe_values.shape_grad (j, q_index)
-		      * fe_values.JxW (q_index));
+      Triangulation<dim> triangulation;
+      FE_Q<dim> fe;
+      DoFHandler<dim> dof_handler;
 
-	  for (unsigned int i = 0; i < dofs_per_cell; ++i)
-	    cell_rhs (i) += (fe_values.shape_value (i, q_index) * 1
-		* fe_values.JxW (q_index));
-	}
-      cell->get_dof_indices (local_dof_indices);
+      ConstraintMatrix constraints;
 
-      for (unsigned int i = 0; i < dofs_per_cell; ++i)
-	for (unsigned int j = 0; j < dofs_per_cell; ++j)
-	  system_matrix.add (local_dof_indices[i], local_dof_indices[j],
-			     cell_matrix (i, j));
+      SparsityPattern sparsity_pattern;
+      SparseMatrix<double> mass_matrix;
+      SparseMatrix<double> laplace_matrix;
+      SparseMatrix<double> system_matrix;
+      SparseMatrix<double> tmp;
 
-      for (unsigned int i = 0; i < dofs_per_cell; ++i)
-	system_rhs (local_dof_indices[i]) += cell_rhs (i);
+      Vector<double> solution;
+      Vector<double> old_solution;
+      Vector<double> system_rhs;
+
+      double time;
+      double time_step;
+      unsigned int timestep_number;
+      int N, total_time_step;
+      double** solution_store;
+    };
+
+  template<int dim>
+    HeatEquation<dim>::HeatEquation (int N, int total_time_step) :
+	fe (1), dof_handler (triangulation), time (0.0), time_step (1. / 2047), timestep_number (
+	    0), N (N), total_time_step (total_time_step)
+    {
+      solution_store = Matcreate (N + 1, total_time_step + 1);
     }
 
-  std::map<types::global_dof_index, double> boundary_values;
-  VectorTools::interpolate_boundary_values (dof_handler, 0, ZeroFunction<2> (),
-					    boundary_values);
-  MatrixTools::apply_boundary_values (boundary_values, system_matrix, solution,
-				      system_rhs);
-  VectorTools::interpolate_boundary_values (dof_handler, 1, ConstantFunction<2> (1.),
-					    boundary_values);
-  MatrixTools::apply_boundary_values (boundary_values, system_matrix, solution,
-				      system_rhs);
-}
+  template<int dim>
+    void
+    HeatEquation<dim>::setup_system ()
+    {
+      dof_handler.distribute_dofs (fe);
+
+      std::cout << std::endl << "==========================================="
+	  << std::endl << "Number of active cells: "
+	  << triangulation.n_active_cells () << std::endl
+	  << "Number of degrees of freedom: " << dof_handler.n_dofs ()
+	  << std::endl << std::endl;
+
+      DynamicSparsityPattern dsp (dof_handler.n_dofs ());
+      DoFTools::make_sparsity_pattern (dof_handler, dsp, constraints,
+      /*keep_constrained_dofs = */true);
+      sparsity_pattern.copy_from (dsp);
+
+      mass_matrix.reinit (sparsity_pattern);
+      laplace_matrix.reinit (sparsity_pattern);
+      system_matrix.reinit (sparsity_pattern);
+      tmp.reinit (sparsity_pattern);
+
+      MatrixCreator::create_mass_matrix (dof_handler,
+					 QGauss<dim> (fe.degree + 1),
+					 mass_matrix);
+      MatrixCreator::create_laplace_matrix (dof_handler,
+					    QGauss<dim> (fe.degree + 1),
+					    laplace_matrix);
+
+      solution.reinit (dof_handler.n_dofs ());
+      old_solution.reinit (dof_handler.n_dofs ());
+      system_rhs.reinit (dof_handler.n_dofs ());
+
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::solve_time_step ()
+    {
+      SolverControl solver_control (8000, 1e-6);
+      SolverCG<> solver (solver_control);
+      solver.solve (system_matrix, solution, system_rhs,
+		    PreconditionIdentity ());
+
+      std::cout << "     " << solver_control.last_step () << " CG iterations."
+	  << std::endl;
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::output_results () const
+    {
+      DataOut<dim> data_out;
+
+      data_out.attach_dof_handler (dof_handler);
+      data_out.add_data_vector (solution, "U");
+
+      data_out.build_patches ();
+
+      const std::string filename = "solution-"
+	  + Utilities::int_to_string (timestep_number, 3) + ".vtk";
+      std::ofstream output (filename.c_str ());
+      data_out.write_vtk (output);
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::run ()
+    {
+      std::vector<unsigned int> repetitions;
+      repetitions.push_back (N - 1);
+      repetitions.push_back (1);
+      GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,
+						 Point<2> (0.0, 0.0),
+						 Point<2> (3.72374, 0.1), true);
+
+      std::cout << "Number of active cells: " << triangulation.n_active_cells ()
+	  << std::endl;
+
+
+//      int de;
+//      scanf ("%d", &de);
+
+      setup_system ();
+
+      Vector<double> forcing_terms;
+      Vector<double> yita;
+
+      yita.reinit (solution.size ());
+      yita = 1.;
+
+      forcing_terms.reinit (solution.size ());
+
+      VectorTools::interpolate (dof_handler, ZeroFunction<dim> (),
+				old_solution);
+      old_solution = 1.;
+      solution = old_solution;
+
+      output_results ();
+
+      while (timestep_number < total_time_step - 1)
+	{
+	  time += time_step;
+	  ++timestep_number;
+
+	  std::cout << "Time step " << timestep_number << " at t=" << time
+	      << std::endl;
+
+	  system_matrix.copy_from (mass_matrix);
+	  system_matrix.add (time_step, laplace_matrix);
+	  tmp.copy_from (mass_matrix);
+//	  tmp.print (std::cout);
+	  for (unsigned int i = 0; i < tmp.m (); i++)
+	    {
+	      SparseMatrix<double>::iterator begin = tmp.begin (i), end =
+		  tmp.end (i);
+	      for (; begin != end; ++begin)
+		{
+		  begin->value () *= yita[i];
+		}
+	    }
+	  system_matrix.add (time_step, tmp);
+
+	  mass_matrix.vmult (system_rhs, old_solution);
+
+//	  if (period == 1)
+//	    {
+//	      std::vector<
+//		  GridTools::PeriodicFacePair<
+//		      typename Triangulation<2>::cell_iterator> > periodicity_vector;
+//	      GridTools::collect_periodic_faces (triangulation, 2, 3, 1,
+//						 periodicity_vector);
+//	      triangulation.add_periodicity (periodicity_vector);
+//	      period = 0;
+//	    }
+
+	  std::map<types::global_dof_index, double> boundary_values;
+	  VectorTools::interpolate_boundary_values (dof_handler, 0,
+						    ZeroFunction<2> (),
+						    boundary_values);
+	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
+					      solution, system_rhs);
+	  VectorTools::interpolate_boundary_values (dof_handler, 1,
+						    ConstantFunction<2> (0.),
+						    boundary_values);
+	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
+					      solution, system_rhs);
+
+	  solve_time_step ();
+
+	  output_results ();
+
+	  old_solution = solution;
 
 
 
-void
-Step3::solve ()
-{
-  SolverControl solver_control (8000, 1e-6);
-  SolverCG<> solver (solver_control);
+	}
 
-  solver.solve (system_matrix, solution, system_rhs, PreconditionIdentity ());
-}
+      Matfree (solution_store);
+    }
 
-void
-Step3::output_results () const
-{
-  DataOut<2> data_out;
-  data_out.attach_dof_handler (dof_handler);
-  data_out.add_data_vector (solution, "solution");
-  data_out.build_patches ();
-
-  std::ofstream output ("solution.vtk");
-  data_out.write_vtk (output);
-}
-
-void
-Step3::run ()
-{
-  make_grid ();
-  setup_system ();
-  assemble_system ();
-  solve ();
-  output_results ();
 }
 
 int
 main ()
 {
-  deallog.depth_console (2);
+  try
+    {
+      using namespace dealii;
+      using namespace Step26;
 
-  Step3 laplace_problem;
-  laplace_problem.run ();
-  std::cout << "calculation Done! ";
+      HeatEquation<2> heat_equation_solver (33, 2048);
+      heat_equation_solver.run ();
+
+    }
+  catch (std::exception &exc)
+    {
+      std::cerr << std::endl << std::endl
+	  << "----------------------------------------------------"
+	  << std::endl;
+      std::cerr << "Exception on processing: " << std::endl << exc.what ()
+	  << std::endl << "Aborting!" << std::endl
+	  << "----------------------------------------------------"
+	  << std::endl;
+
+      return 1;
+    }
+  catch (...)
+    {
+      std::cerr << std::endl << std::endl
+	  << "----------------------------------------------------"
+	  << std::endl;
+      std::cerr << "Unknown exception!" << std::endl << "Aborting!" << std::endl
+	  << "----------------------------------------------------"
+	  << std::endl;
+      return 1;
+    }
+
   return 0;
 }
