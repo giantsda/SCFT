@@ -107,10 +107,37 @@ namespace Step26
 
       double time;
       double time_step;
-      unsigned int timestep_number;
+      int timestep_number;
       int N, total_time_step;
       double** solution_store;
+      double* f0;
     };
+
+  template<int dim>
+    class Initial_condition : public Function<dim>
+    {
+    public:
+      Initial_condition () :
+	  Function<dim> ()
+      {
+      }
+      virtual double
+      value (const Point<dim> &p, const unsigned int component = 0) const;
+    };
+
+  template<int dim>
+    double
+    Initial_condition<dim>::value (const Point<dim> &p,
+				   const unsigned int component) const
+    {
+      (void) component;
+      Assert(component == 0, ExcIndexRange(component, 0, 1));
+      Assert(dim == 2, ExcNotImplemented());
+      if (p[0] == 0. || p[0] == 1.)
+	return 0.;
+      else
+	return 1.;
+    }
 
   template<int dim>
     HeatEquation<dim>::HeatEquation (int N, int total_time_step) :
@@ -118,6 +145,7 @@ namespace Step26
 	    0), N (N), total_time_step (total_time_step)
     {
       solution_store = Matcreate (N + 1, total_time_step + 1);
+      f0 = (double*) malloc (sizeof(double) * N);
     }
 
   template<int dim>
@@ -191,39 +219,65 @@ namespace Step26
     {
       std::vector<unsigned int> repetitions;
       repetitions.push_back (N - 1);
+
       repetitions.push_back (1);
       GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,
 						 Point<2> (0.0, 0.0),
-						 Point<2> (3.72374, 0.1), true);
+						 Point<2> (1, 1./N), true);
 
       std::cout << "Number of active cells: " << triangulation.n_active_cells ()
 	  << std::endl;
 
+//      std::ofstream out ("grid-1.vtk");
+//      GridOut grid_out;
+//      grid_out.write_vtk (triangulation, out);
+//      std::cout << "Grid written to grid-1.vtk" << std::endl;
 
-//      int de;
-//      scanf ("%d", &de);
+      int de;
 
       setup_system ();
 
-      Vector<double> forcing_terms;
       Vector<double> yita;
 
       yita.reinit (solution.size ());
       yita = 1.;
 
-      forcing_terms.reinit (solution.size ());
 
-      VectorTools::interpolate (dof_handler, ZeroFunction<dim> (),
-				old_solution);
-      old_solution = 1.;
+      VectorTools::interpolate (dof_handler, Initial_condition<dim> (),
+     				old_solution);
+
+
       solution = old_solution;
 
       output_results ();
 
-      while (timestep_number < total_time_step - 1)
+      std::vector<int> solution_table (N);
+
+      for (int i = 0; i < N; i++)
+	{
+	  if (i == 0)
+	    solution_table[i] = 0;
+	  else if (i == 1)
+	    solution_table[i] = 1;
+	  else
+	    solution_table[i] = i * 2;
+	}
+
+//      for (int i = 0; i < N; i++)
+//	printf ("%d>>%d  \n", i, solution_table[i]);
+
+//      scanf ("%d", &de);
+
+      for (int i = 2; i < N; i++)
+	solution_store[i][0] = 1.;
+
+
+      int period=1;
+
+
+      for (timestep_number=1; timestep_number < total_time_step; timestep_number++)
 	{
 	  time += time_step;
-	  ++timestep_number;
 
 	  std::cout << "Time step " << timestep_number << " at t=" << time
 	      << std::endl;
@@ -231,7 +285,9 @@ namespace Step26
 	  system_matrix.copy_from (mass_matrix);
 	  system_matrix.add (time_step, laplace_matrix);
 	  tmp.copy_from (mass_matrix);
-//	  tmp.print (std::cout);
+
+//	  std::ofstream out("haha.txt");
+//	  tmp.print (out);
 	  for (unsigned int i = 0; i < tmp.m (); i++)
 	    {
 	      SparseMatrix<double>::iterator begin = tmp.begin (i), end =
@@ -241,10 +297,15 @@ namespace Step26
 		  begin->value () *= yita[i];
 		}
 	    }
+
+//	  tmp.print (std::cout);
+//	  old_solution.print (std::cout);
+//	  scanf("%d",&de);
 	  system_matrix.add (time_step, tmp);
 
 	  mass_matrix.vmult (system_rhs, old_solution);
 
+//
 //	  if (period == 1)
 //	    {
 //	      std::vector<
@@ -272,10 +333,49 @@ namespace Step26
 
 	  output_results ();
 
+//	  scanf("%d",&de);
+
 	  old_solution = solution;
 
+	  solution_store[0][timestep_number] = time;
+	  for (int i = 0; i < N; i++)
+	    {
+	      solution_store[i + 1][timestep_number] =
+		  solution[solution_table[i]];
+	    }
 
+	}
 
+      FILE * fp;
+
+      fp = fopen ("fhaha.txt", "w+");
+
+      // plot solution;
+      for (int i = 0; i < N + 1; i++)
+	{
+	  for (int j = 0; j < total_time_step; j++)
+	    fprintf (fp, "%f,", solution_store[i][j]);
+	  fprintf (fp, "\n");
+	}
+
+      fclose (fp);
+
+      //   integrate for f0
+      //   TODO:change this to better integration method
+
+      printf ("f0: \n");
+      for (int i = 0; i < N; i++)
+	{
+	  f0[i] = 0.0;
+	  for (int j = 0; j < total_time_step; j++)
+	    {
+	      double value_left = solution_store[i + 1][j]
+		  * solution_store[i + 1][total_time_step - j];
+	      double value_right = solution_store[i + 1][j + 1]
+		  * solution_store[i + 1][total_time_step - j - 1];
+	      f0[i] = f0[i] + 0.5 * time_step * (value_left + value_right);
+	    }
+	  printf ("%f \n", f0[i]);
 	}
 
       Matfree (solution_store);
@@ -292,6 +392,7 @@ main ()
       using namespace Step26;
 
       HeatEquation<2> heat_equation_solver (33, 2048);
+//      HeatEquation<2> heat_equation_solver (33, 10);
       heat_equation_solver.run ();
 
     }

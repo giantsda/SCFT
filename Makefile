@@ -7,7 +7,7 @@ gaussj.o: gaussj.c
 adm.o: adm.c    
 	gcc adm.c -c -g
 
-adm.o: broydn.o    
+broydn.o: broydn.c    
 	gcc broydn.c -c -g
 
 1D_FEM.o: 1D_FEM.c   

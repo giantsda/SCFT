@@ -243,14 +243,20 @@ simple_FEM_1D_transient (int NN, double* yita_middle, double * out)
   ierr = VecDestroy (&xold);
   CHKERRQ(ierr);
 
-////   Plot results
-//  printf ("solution_store: \n");
-//  for (int i = 0; i < N + 1; i++)
-//    {
-//      for (int j = 0; j < time_step + 1; j++)
-//	printf ("%f, ", solution_store[i][j]);
-//      printf ("\n");
-//    }
+//   Plot results
+
+  FILE * fp;
+  fp = fopen ("1D_FEM.txt", "w+");
+  printf ("solution_store: \n");
+  for (int i = 0; i < N + 1; i++)
+    {
+      for (int j = 0; j < time_step + 1; j++)
+	fprintf (fp, "%f,", solution_store[i][j]);
+      fprintf (fp, "\n");
+    }
+  fclose (fp);
+
+  scanf ("%d", &de);
 
 //   integrate for f0
 //   TODO:change this to better integration method
