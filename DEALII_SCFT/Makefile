@@ -20,6 +20,6 @@ run:  step-3.cc.o gaussj.o nrutil.o broydn.o
 	 
 
 clean :
-	rm *.o step-3 *.vtk
+	rm *.o step-3 *.vtk solution_store.txt
 
  

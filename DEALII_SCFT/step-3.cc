@@ -52,6 +52,7 @@
 #include "nr.h"
 #include "nrutil.h"
 
+double* f0_given;
 double **qt, **r, *d, /* qt[1:n,1:n], r[1:n,1:n] and d[1:n] must be allocated in the calling program */
 err; /* Passed in as the convergence criterion, and returned with the actual residual error */
 int funcerr, /* Flag for error in evaluating the function in Broyden method */
@@ -121,8 +122,11 @@ namespace Step26
       int N, total_time_step;
       double** solution_store;
       double* f0;
-      double* yita;
       double L;
+      double* yita_middle_1D;
+      double* yita_full_1D;
+      double* yita_full_2D;
+      double* out;
     };
 
   template<int dim>
@@ -155,11 +159,15 @@ namespace Step26
     HeatEquation<dim>::HeatEquation (int N, int total_time_step, double L,
 				     double* yita) :
 	fe (1), dof_handler (triangulation), time (0.0), time_step (1. / 2047), timestep_number (
-	    0), N (N), total_time_step (total_time_step), yita (yita), L (L)
+	    0), N (N), total_time_step (total_time_step), L (L), yita_middle_1D (
+	    yita)
     {
       time_step = 1. / (total_time_step - 1);
       solution_store = Matcreate (N + 1, total_time_step + 1);
       f0 = (double*) malloc (sizeof(double) * N);
+      yita_full_1D = (double*) malloc (sizeof(double) * N);
+      yita_full_2D = (double*) malloc (sizeof(double) * 2 * N);
+      out = (double*) malloc (sizeof(double) * (N - 1));
     }
 
   template<int dim>
@@ -201,7 +209,7 @@ namespace Step26
     void
     HeatEquation<dim>::solve_time_step ()
     {
-      SolverControl solver_control (8000, 1e-6);
+      SolverControl solver_control (8000, 1e-13);
       SolverCG<> solver (solver_control);
       solver.solve (system_matrix, solution, system_rhs,
 		    PreconditionIdentity ());
@@ -231,9 +239,9 @@ namespace Step26
     double *
     HeatEquation<dim>::run ()
     {
+      int de;
       std::vector<unsigned int> repetitions;
       repetitions.push_back (N - 1);
-
       repetitions.push_back (1);
       GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,
 						 Point<2> (0.0, 0.0),
@@ -242,19 +250,27 @@ namespace Step26
       std::cout << "Number of active cells: " << triangulation.n_active_cells ()
 	  << std::endl;
 
+      // convert yita_middle_1D to yita_full_2D;
+      for (int i = 1; i < N - 1; i++)
+	yita_full_1D[i] = yita_middle_1D[i - 1];
+      yita_full_1D[0] = 0.;
+      yita_full_1D[N] = 0.;
+      for (int i = 2; i < N; i++)
+	{
+	  yita_full_2D[2 * i] = yita_full_1D[i];
+	  yita_full_2D[2 * i + 1] = yita_full_1D[i];
+	}
+      yita_full_2D[0] = yita_full_1D[0];
+      yita_full_2D[2] = yita_full_1D[0];
+      yita_full_2D[1] = yita_full_1D[1];
+      yita_full_2D[3] = yita_full_1D[1];
+
 //      std::ofstream out ("grid-1.vtk");
 //      GridOut grid_out;
 //      grid_out.write_vtk (triangulation, out);
 //      std::cout << "Grid written to grid-1.vtk" << std::endl;
 
-      int de;
-
       setup_system ();
-
-      Vector<double> yita;
-
-      yita.reinit (solution.size ());
-      yita = 1.;
 
       VectorTools::interpolate (dof_handler, Initial_condition<dim> (),
 				old_solution);
@@ -297,21 +313,21 @@ namespace Step26
 	  system_matrix.add (time_step, laplace_matrix);
 	  tmp.copy_from (mass_matrix);
 
+	  printf ("tmp is a %d by %d mat \n", tmp.m (), tmp.m ());
+
 //	  std::ofstream out("haha.txt");
 //	  tmp.print (out);
+
 	  for (unsigned int i = 0; i < tmp.m (); i++)
 	    {
 	      SparseMatrix<double>::iterator begin = tmp.begin (i), end =
 		  tmp.end (i);
 	      for (; begin != end; ++begin)
 		{
-		  begin->value () *= yita[i];
+		  begin->value () *= yita_full_2D[i];
 		}
 	    }
 
-//	  tmp.print (std::cout);
-//	  old_solution.print (std::cout);
-//	  scanf("%d",&de);
 	  system_matrix.add (time_step, tmp);
 
 	  mass_matrix.vmult (system_rhs, old_solution);
@@ -327,31 +343,26 @@ namespace Step26
 						    boundary_values);
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
 					      solution, system_rhs);
-
 	  solve_time_step ();
-
 	  output_results ();
-
 	  old_solution = solution;
-
 	  solution_store[0][timestep_number] = time;
 	  for (int i = 0; i < N; i++)
 	    {
 	      solution_store[i + 1][timestep_number] =
 		  solution[solution_table[i]];
 	    }
-
 	}
 
       FILE * fp;
 
-      fp = fopen ("fhaha.txt", "w+");
+      fp = fopen ("solution_store.txt", "w+");
 
       // plot solution;
       for (int i = 0; i < N + 1; i++)
 	{
 	  for (int j = 0; j < total_time_step; j++)
-	    fprintf (fp, "%f,", solution_store[i][j]);
+	    fprintf (fp, "%2.15f,", solution_store[i][j]);
 	  fprintf (fp, "\n");
 	}
 
@@ -376,9 +387,36 @@ namespace Step26
 	}
 
       Matfree (solution_store);
-      return f0;
+      for (int i = 1; i <= N - 2; i++)
+          {
+	  ;
+//	  out[i] = 1.2;
+	  out[i] = f0[i] - f0_given[i];
+//	  printf("i=%d,f0=%f,f0_given=%f \n",i,f0[i],f0_given[i]);
+          }
+
+      return out;
     }
 
+}
+
+void
+get_f0_given (double tau, double L, int N)
+{
+  double x[N];
+  for (int i = 0; i < N; i++)
+    {
+      f0_given[i] = 1.;
+      x[i] = i * L / (N - 1);
+    }
+  int x_left = ceil (N * tau / L);
+  for (int i = 0; i < x_left; i++)
+    {
+      f0_given[i] = pow ((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) - 1),
+			 2)
+	  / pow (((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) + 1)), 2);
+      f0_given[N - i - 1] = f0_given[i];
+    }
 }
 
 int
@@ -390,46 +428,23 @@ main ()
       using namespace Step26;
       int N = 33;
       int de;
-      double* yita_given = (double*) malloc (N * sizeof(double));
-      double* yita = (double*) malloc (N * sizeof(double) * 2);
-      double yita_middle[N - 2]; // initial guess, the ends are bounded
-      double* f0_given = (double*) malloc (N * sizeof(double));
-      double tau = 0.5302, L = 3.72374, x[N];
+      double* yita_1D = (double*) malloc (N * sizeof(double)); // this is the yita for 1D, length=N;
+      double* yita_2D = (double*) malloc (N * sizeof(double) * 2); // need to convert it to 2D because mat is 2N by 2N;
+      double yita_middle[N - 2]; // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
+      f0_given = (double*) malloc (N * sizeof(double)); // this is the ideal f0;
+      double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
 
       for (int i = 0; i < N; i++)
-	yita_given[i] = i;
-
+	yita_1D[i] = i;
       // Convert yita_given to yita, because we are at a 2D problem, every node needs a associate yita value.
 
-      for (int i = 2; i < N; i++)
-	{
-	  yita[2 * i] = yita_given[i];
-	  yita[2 * i + 1] = yita_given[i];
-	}
-      yita[0] = yita_given[0];
-      yita[2] = yita_given[0];
-      yita[1] = yita_given[1];
-      yita[3] = yita_given[1];
-
-      for (int i = 0; i < N; i++)
-	{
-	  f0_given[i] = 1.;
-	  x[i] = i * L / (N - 1);
-	}
-      int x_left = ceil (N * tau / L);
-      for (int i = 0; i < x_left; i++)
-	{
-	  f0_given[i] = pow (
-	      (exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) - 1), 2)
-	      / pow (((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) + 1)),
-		     2);
-	  f0_given[N - i - 1] = f0_given[i];
-	}
-
+      get_f0_given (tau, L, N);
       printf ("f0_given\n");
       for (int i = 0; i < N; i++)
 	printf ("%f \n", f0_given[i]);
       printf ("\n");
+
+//      scanf ("%d", &de);
 
       // read data from file:
       FILE *file;
@@ -460,16 +475,17 @@ main ()
 	  printf ("%f \n", yita_middle[i]);
 	}
 
-      HeatEquation<2> heat_equation_solver (N, 2048, 3.72374, yita);
+//      scanf ("%d", &de);
 
-      double* f0 =heat_equation_solver.run ();
+      HeatEquation<2> heat_equation_solver (N, 2048, L, yita_middle);
 
-      for (int i = 0; i < N; i++)
-	printf ("f0[%d]=%0.16f \n", i, f0[i]);
+      double* out = heat_equation_solver.run ();
 
-      free (yita);
-      free (yita_given);
+      for (int i = 1; i < N-1; i++)
+	printf ("out[%d]=%0.16f \n", i, out[i]);
 
+      free (yita_2D);
+      free (yita_1D);
     }
   catch (std::exception &exc)
     {

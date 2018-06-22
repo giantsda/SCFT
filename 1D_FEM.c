@@ -281,7 +281,7 @@ simple_FEM_1D_transient (int NN, double* yita_middle, double * out)
 //      out[i] = f0[i + 1] - f0_given[i + 1]+ yita_middle[i];
 //    }
 
-  for (int i = 1; i <= N - 2; i++)
+  for (int i = 1; i < N - 1; i++)
     {
       out[i] = f0[i] - f0_given[i];
     }
@@ -314,7 +314,7 @@ main ()
     {
       yita_middle[i] = 1;
     }
-  double out[N - 2]; // results
+  double out[N - 1]; // results
   // calculate f0_given so that I can use andmix
   double tau = 0.5302, L = 3.72374;
 
