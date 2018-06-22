@@ -354,7 +354,7 @@ main ()
   while (fgets (buff, 255, (FILE*) file))
     {
       sscanf (buff, "%lf %lf %lf %lf %lf", &c, &c, &e, &c, &c);
-      yita_middle[line] = e * 0.;
+      yita_middle[line] = e ;
       line++;
       if (line == N - 2)
 	break;
