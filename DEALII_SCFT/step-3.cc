@@ -49,6 +49,16 @@
 #include <fstream>
 #include <iostream>
 
+#include "nr.h"
+#include "nrutil.h"
+
+double **qt, **r, *d, /* qt[1:n,1:n], r[1:n,1:n] and d[1:n] must be allocated in the calling program */
+err; /* Passed in as the convergence criterion, and returned with the actual residual error */
+int funcerr, /* Flag for error in evaluating the function in Broyden method */
+jc; /* For re-use of Jacobian. jc denotes the status of Jacobian calculation: 0 for not calculated,
+ 1 for previously calculated, 2 for currently calculated */
+int PRINT;
+
 double **
 Matcreate (int r, int c)
 {
@@ -75,7 +85,7 @@ namespace Step26
     {
     public:
       HeatEquation (int N, int total_time_step, double L, double* yita);
-      double*
+      double *
       run ();
 
     private:
@@ -191,7 +201,7 @@ namespace Step26
     void
     HeatEquation<dim>::solve_time_step ()
     {
-      SolverControl solver_control (8000, 1e-15);
+      SolverControl solver_control (8000, 1e-6);
       SolverCG<> solver (solver_control);
       solver.solve (system_matrix, solution, system_rhs,
 		    PreconditionIdentity ());
@@ -218,7 +228,7 @@ namespace Step26
     }
 
   template<int dim>
-    double*
+    double *
     HeatEquation<dim>::run ()
     {
       std::vector<unsigned int> repetitions;
@@ -240,6 +250,12 @@ namespace Step26
       int de;
 
       setup_system ();
+
+      Vector<double> yita;
+
+      yita.reinit (solution.size ());
+      yita = 1.;
+
       VectorTools::interpolate (dof_handler, Initial_condition<dim> (),
 				old_solution);
 
@@ -290,14 +306,12 @@ namespace Step26
 	      for (; begin != end; ++begin)
 		{
 		  begin->value () *= yita[i];
-//		  printf ("yita[%d] =%f \n", i, yita[i]);
 		}
 	    }
 
-	  printf ("tmp is a %d by %d mat \n", tmp.m (), tmp.m ());
-
-//	  scanf ("%d", &de);
-
+//	  tmp.print (std::cout);
+//	  old_solution.print (std::cout);
+//	  scanf("%d",&de);
 	  system_matrix.add (time_step, tmp);
 
 	  mass_matrix.vmult (system_rhs, old_solution);
@@ -313,12 +327,6 @@ namespace Step26
 						    boundary_values);
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
 					      solution, system_rhs);
-
-//	  system_matrix.print (std::cout);
-//
-//	  system_rhs.print (std::cout);
-//
-//	  scanf ("%d", &de);
 
 	  solve_time_step ();
 
@@ -337,13 +345,13 @@ namespace Step26
 
       FILE * fp;
 
-      fp = fopen ("solution_store.txt", "w+");
+      fp = fopen ("fhaha.txt", "w+");
 
       // plot solution;
       for (int i = 0; i < N + 1; i++)
 	{
 	  for (int j = 0; j < total_time_step; j++)
-	    fprintf (fp, "%2.15f,", solution_store[i][j]);
+	    fprintf (fp, "%f,", solution_store[i][j]);
 	  fprintf (fp, "\n");
 	}
 
@@ -369,8 +377,8 @@ namespace Step26
 
       Matfree (solution_store);
       return f0;
-
     }
+
 }
 
 int
@@ -380,15 +388,13 @@ main ()
     {
       using namespace dealii;
       using namespace Step26;
-
       int N = 33;
       int de;
-
       double* yita_given = (double*) malloc (N * sizeof(double));
       double* yita = (double*) malloc (N * sizeof(double) * 2);
       double yita_middle[N - 2]; // initial guess, the ends are bounded
       double* f0_given = (double*) malloc (N * sizeof(double));
-      double tau = 0.5302, L = 3.72374,x[N];
+      double tau = 0.5302, L = 3.72374, x[N];
 
       for (int i = 0; i < N; i++)
 	yita_given[i] = i;
@@ -404,12 +410,6 @@ main ()
       yita[2] = yita_given[0];
       yita[1] = yita_given[1];
       yita[3] = yita_given[1];
-
-//      for (int i = 0; i < 2 * N; i++)
-//	yita[i] = 5.0;
-
-
-
 
       for (int i = 0; i < N; i++)
 	{
@@ -432,43 +432,37 @@ main ()
       printf ("\n");
 
       // read data from file:
-        FILE *file;
-        file = fopen ("Exp_m32_n2048_IE.res", "r");
-        if (file == NULL)
-          {
-            fprintf (stderr, "Can't open input file in.list!\n");
-            return 1;
-          }
-        char buff[255];
-        int line = 0;
-        double c, e;
-        for (int i = 0; i < 10; i++)
-          fgets (buff, 255, (FILE*) file);
-        while (fgets (buff, 255, (FILE*) file))
-          {
-            sscanf (buff, "%lf %lf %lf %lf %lf", &c, &c, &e, &c, &c);
-            yita_middle[line] = e ;
-            line++;
-            if (line == N - 2)
-      	break;
-          }
-        fclose (file);
+      FILE *file;
+      file = fopen ("Exp_m32_n2048_IE.res", "r");
+      if (file == NULL)
+	{
+	  fprintf (stderr, "Can't open input file in.list!\n");
+	  return 1;
+	}
+      char buff[255];
+      int line = 0;
+      double c, e;
+      for (int i = 0; i < 10; i++)
+	fgets (buff, 255, (FILE*) file);
+      while (fgets (buff, 255, (FILE*) file))
+	{
+	  sscanf (buff, "%lf %lf %lf %lf %lf", &c, &c, &e, &c, &c);
+	  yita_middle[line] = e;
+	  line++;
+	  if (line == N - 2)
+	    break;
+	}
+      fclose (file);
 
-        for (int i = 0; i < N - 2; i++)
-          {
-            printf ("%f \n", yita_middle[i]);
-          }
-
-
-
-      scanf("%d",&de);
-
-
-
+      printf ("yita_middle :\n");
+      for (int i = 0; i < N - 2; i++)
+	{
+	  printf ("%f \n", yita_middle[i]);
+	}
 
       HeatEquation<2> heat_equation_solver (N, 2048, 3.72374, yita);
-//      HeatEquation<2> heat_equation_solver (7, 3, 3.72374, yita);
-      double* f0 = heat_equation_solver.run ();
+
+      double* f0 =heat_equation_solver.run ();
 
       for (int i = 0; i < N; i++)
 	printf ("f0[%d]=%0.16f \n", i, f0[i]);
