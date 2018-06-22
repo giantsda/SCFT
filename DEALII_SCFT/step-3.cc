@@ -246,7 +246,6 @@ namespace Step26
       GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,
 						 Point<2> (0.0, 0.0),
 						 Point<2> (L, L / N), true);
-
       std::cout << "Number of active cells: " << triangulation.n_active_cells ()
 	  << std::endl;
 
@@ -271,16 +270,11 @@ namespace Step26
 //      std::cout << "Grid written to grid-1.vtk" << std::endl;
 
       setup_system ();
-
       VectorTools::interpolate (dof_handler, Initial_condition<dim> (),
 				old_solution);
-
       solution = old_solution;
-
       output_results ();
-
       std::vector<int> solution_table (N);
-
       for (int i = 0; i < N; i++)
 	{
 	  if (i == 0)
@@ -291,16 +285,10 @@ namespace Step26
 	    solution_table[i] = i * 2;
 	}
 
-//      for (int i = 0; i < N; i++)
-//	printf ("%d>>%d  \n", i, solution_table[i]);
-
-//      scanf ("%d", &de);
-
       for (int i = 2; i < N; i++)
 	solution_store[i][0] = 1.;
 
       int period = 1;
-
       for (timestep_number = 1; timestep_number < total_time_step;
 	  timestep_number++)
 	{
@@ -329,9 +317,7 @@ namespace Step26
 	    }
 
 	  system_matrix.add (time_step, tmp);
-
 	  mass_matrix.vmult (system_rhs, old_solution);
-
 	  std::map<types::global_dof_index, double> boundary_values;
 	  VectorTools::interpolate_boundary_values (dof_handler, 0,
 						    ZeroFunction<2> (),
@@ -354,11 +340,9 @@ namespace Step26
 	    }
 	}
 
+      // write solution;
       FILE * fp;
-
       fp = fopen ("solution_store.txt", "w+");
-
-      // plot solution;
       for (int i = 0; i < N + 1; i++)
 	{
 	  for (int j = 0; j < total_time_step; j++)
@@ -388,12 +372,9 @@ namespace Step26
 
       Matfree (solution_store);
       for (int i = 1; i <= N - 2; i++)
-          {
-	  ;
-//	  out[i] = 1.2;
+	{
 	  out[i] = f0[i] - f0_given[i];
-//	  printf("i=%d,f0=%f,f0_given=%f \n",i,f0[i],f0_given[i]);
-          }
+	}
 
       return out;
     }
@@ -417,6 +398,28 @@ get_f0_given (double tau, double L, int N)
 	  / pow (((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) + 1)), 2);
       f0_given[N - i - 1] = f0_given[i];
     }
+}
+
+void
+myfun (int n, double * x, double * xnew)
+{
+  xnew[1] = x[1] * 0.5 - 2.;
+  xnew[2] = x[2] * 0.5 + 3.;
+//  printf ("x[1]=%.14f,x[2]=%.14f, xnew[1]=%.14f xnew[2]=%.14f \n", x[1], x[2],
+//	  xnew[1], xnew[2]);
+}
+
+
+
+void
+SCFT_wrapper (int N, double * in, double * out)
+{
+
+
+;
+
+
+
 }
 
 int
@@ -444,8 +447,6 @@ main ()
 	printf ("%f \n", f0_given[i]);
       printf ("\n");
 
-//      scanf ("%d", &de);
-
       // read data from file:
       FILE *file;
       file = fopen ("Exp_m32_n2048_IE.res", "r");
@@ -469,19 +470,32 @@ main ()
 	}
       fclose (file);
 
-      printf ("yita_middle :\n");
-      for (int i = 0; i < N - 2; i++)
-	{
-	  printf ("%f \n", yita_middle[i]);
-	}
+      int check = 1;
+      qt = dmatrix (1, N - 2, 1, N - 2);
+      r = dmatrix (1, N - 2, 1, N - 2);
+      d = dvector (1, N - 2);
+      jc = 0;
+      err = 0.00000001;
+      double* x_nr = dvector (1, N - 2);
+      for (int i = 1; i < N - 1; i++)
+	x_nr[i] = yita_middle[i - 1];
 
-//      scanf ("%d", &de);
+//      broydn (x_nr, N - 2, &check, simple_FEM_1D_transient);
+
+      broydn (x_nr, 2, &check, myfun);
+
+//      void broydn(float x[], int n, int *check,
+//          void (*vecfunc)(int, float [], float []));
+
+      for (int i = 1; i < 5; i++)
+        printf (">>>>%f \n", x_nr[i]);
+      scanf ("%d", &de);
 
       HeatEquation<2> heat_equation_solver (N, 2048, L, yita_middle);
 
       double* out = heat_equation_solver.run ();
 
-      for (int i = 1; i < N-1; i++)
+      for (int i = 1; i < N - 1; i++)
 	printf ("out[%d]=%0.16f \n", i, out[i]);
 
       free (yita_2D);
@@ -512,3 +526,4 @@ main ()
 
   return 0;
 }
+

@@ -405,7 +405,7 @@ main ()
 
   broydn (x_nr, N - 2, &check, simple_FEM_1D_transient);
 //  broydn (x_nr, 2, &check, myfun);
-  for (int i = 1; i <= N - 2; i++)
+  for (int i = 1; i < N - 1; i++)
     printf (">>>>%f \n", x_nr[i]);
 
   free (f0_given);
