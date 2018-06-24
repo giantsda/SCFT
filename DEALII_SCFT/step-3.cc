@@ -58,7 +58,8 @@ err; /* Passed in as the convergence criterion, and returned with the actual res
 int funcerr, /* Flag for error in evaluating the function in Broyden method */
 jc; /* For re-use of Jacobian. jc denotes the status of Jacobian calculation: 0 for not calculated,
  1 for previously calculated, 2 for currently calculated */
-int PRINT;
+int PRINT,total_iteration=1;
+
 
 double **
 Matcreate (int r, int c)
@@ -253,7 +254,7 @@ namespace Step26
       for (int i = 1; i < N - 1; i++)
 	yita_full_1D[i] = yita_middle_1D[i - 1];
       yita_full_1D[0] = 0.;
-      yita_full_1D[N] = 0.;
+      yita_full_1D[N - 1] = 0.;
       for (int i = 2; i < N; i++)
 	{
 	  yita_full_2D[2 * i] = yita_full_1D[i];
@@ -264,20 +265,17 @@ namespace Step26
       yita_full_2D[1] = yita_full_1D[1];
       yita_full_2D[3] = yita_full_1D[1];
 
-      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..1\n");
 //      std::ofstream out ("grid-1.vtk");
 //      GridOut grid_out;
 //      grid_out.write_vtk (triangulation, out);
 //      std::cout << "Grid written to grid-1.vtk" << std::endl;
 
       setup_system ();
-      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..5\n");
       VectorTools::interpolate (dof_handler, Initial_condition<dim> (),
 				old_solution);
       solution = old_solution;
       output_results ();
 
-      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..2\n");
       std::vector<int> solution_table (N);
       for (int i = 0; i < N; i++)
 	{
@@ -298,9 +296,11 @@ namespace Step26
 	{
 	  time += time_step;
 
-	  std::cout << "Time step " << timestep_number << " at t=" << time
-	      << std::endl;
-
+	  if (timestep_number % 100 == 0)
+	    {
+	      std::cout << "Time step " << timestep_number << " at t=" << time
+		  << std::endl;
+	    }
 	  system_matrix.copy_from (mass_matrix);
 	  system_matrix.add (time_step, laplace_matrix);
 	  tmp.copy_from (mass_matrix);
@@ -334,7 +334,7 @@ namespace Step26
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
 					      solution, system_rhs);
 	  solve_time_step ();
-	  output_results ();
+//	  output_results ();
 	  old_solution = solution;
 	  solution_store[0][timestep_number] = time;
 	  for (int i = 0; i < N; i++)
@@ -343,7 +343,6 @@ namespace Step26
 		  solution[solution_table[i]];
 	    }
 	}
-      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..3\n");
 
       // write solution;
       FILE * fp;
@@ -375,14 +374,11 @@ namespace Step26
 //	  printf ("%0.16f \n", f0[i]);
 	}
 
-      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..6\n");
-
       Matfree (solution_store);
       for (int i = 1; i < N - 1; i++)
 	{
 	  out[i] = f0_given[i] - f0[i];
 	}
-      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..7\n");
       return out;
     }
 
@@ -426,6 +422,14 @@ SCFT_wrapper (int N, double * in, double * out)
   double* res = heat_equation_solver.run ();
   for (int i = 1; i < N - 1; i++)
     out[i] = res[i];
+  printf("total_iteration=%d!  \n",total_iteration);
+  total_iteration++;
+  printf ("in: \n");
+  for (int i = 1; i < N - 1; i++)
+    printf ("in[%d]=%f \n", i, in[i]);
+  printf ("out: \n");
+  for (int i = 1; i < N - 1; i++)
+    printf ("out[%d]=%f \n", i, out[i]);
 
 }
 
@@ -488,30 +492,14 @@ main ()
 	x_nr[i] = yita_middle[i - 1];
 
       double* out = (double*) malloc (sizeof(double) * (N - 1));
-//      SCFT_wrapper (N, yita_middle, out);
-//      SCFT_wrapper (N, yita_middle, out);
 
-      for (int i = 0; i < 4; i++)
-	{
-	  Step26::HeatEquation<2> heat_equation_solver (N, 2048, L, yita_middle);
-	   heat_equation_solver.run ();
-	}
+//      for (int i = 0; i < 4; i++)
+//	{
+//	  Step26::HeatEquation<2> heat_equation_solver (N, 2048, L, yita_middle);
+//	   heat_equation_solver.run ();
+//	}
 
-//      broydn (x_nr, N - 2, &check, SCFT_wrapper);
-
-//      broydn (x_nr, 2, &check, myfun);
-
-//      void broydn(float x[], int n, int *check,
-//          void (*vecfunc)(int, float [], float []));
-
-//      for (int i = 1; i < 5; i++)
-//	printf (">>>>%f \n", x_nr[i]);
-//      scanf ("%d", &de);
-
-//      HeatEquation<2> heat_equation_solver (N, 2048, L, yita_middle);
-
-//      double* out = heat_equation_solver.run ();
-
+      broydn (x_nr, N - 2, &check, SCFT_wrapper);
       for (int i = 1; i < N - 1; i++)
 	printf ("out[%d]=%0.16f \n", i, out[i]);
 
