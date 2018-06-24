@@ -58,8 +58,7 @@ err; /* Passed in as the convergence criterion, and returned with the actual res
 int funcerr, /* Flag for error in evaluating the function in Broyden method */
 jc; /* For re-use of Jacobian. jc denotes the status of Jacobian calculation: 0 for not calculated,
  1 for previously calculated, 2 for currently calculated */
-int PRINT,total_iteration=1;
-
+int PRINT, total_iteration = 1;
 
 double **
 Matcreate (int r, int c)
@@ -252,7 +251,7 @@ namespace Step26
 
       // convert yita_middle_1D to yita_full_2D;
       for (int i = 1; i < N - 1; i++)
-	yita_full_1D[i] = yita_middle_1D[i - 1];
+	yita_full_1D[i] = yita_middle_1D[i];
       yita_full_1D[0] = 0.;
       yita_full_1D[N - 1] = 0.;
       for (int i = 2; i < N; i++)
@@ -296,11 +295,11 @@ namespace Step26
 	{
 	  time += time_step;
 
-	  if (timestep_number % 100 == 0)
-	    {
-	      std::cout << "Time step " << timestep_number << " at t=" << time
-		  << std::endl;
-	    }
+//	  if (timestep_number % 100 == 0)
+//	    {
+//	      std::cout << "Time step " << timestep_number << " at t=" << time
+//		  << std::endl;
+//	    }
 	  system_matrix.copy_from (mass_matrix);
 	  system_matrix.add (time_step, laplace_matrix);
 	  tmp.copy_from (mass_matrix);
@@ -359,7 +358,7 @@ namespace Step26
       //   integrate for f0
       //   TODO:change this to better integration method
 
-      printf ("f0: \n");
+//      printf ("f0: \n");
       for (int i = 0; i < N; i++)
 	{
 	  f0[i] = 0.0;
@@ -416,20 +415,25 @@ void
 SCFT_wrapper (int N, double * in, double * out)
 {
   double L = 3.72374;
-
+  N = N + 2;
   Step26::HeatEquation<2> heat_equation_solver (N, 2048, L, in);
-
   double* res = heat_equation_solver.run ();
   for (int i = 1; i < N - 1; i++)
     out[i] = res[i];
-  printf("total_iteration=%d!  \n",total_iteration);
-  total_iteration++;
+  printf ("total_iteration=%d!  \n", total_iteration);
+
   printf ("in: \n");
   for (int i = 1; i < N - 1; i++)
-    printf ("in[%d]=%f \n", i, in[i]);
+    printf ("in[%d]=%2.15f ; total_iteration:%d \n", i, in[i], total_iteration);
   printf ("out: \n");
   for (int i = 1; i < N - 1; i++)
-    printf ("out[%d]=%f \n", i, out[i]);
+    printf ("out[%d]=%2.15f ; total_iteration:%d \n", i, out[i],
+	    total_iteration);
+  fflush (stdout);
+  total_iteration++;
+  int de;
+
+//  scanf ("%d", &de);
 
 }
 
@@ -444,7 +448,7 @@ main ()
       int de;
       double* yita_1D = (double*) malloc (N * sizeof(double)); // this is the yita for 1D, length=N;
       double* yita_2D = (double*) malloc (N * sizeof(double) * 2); // need to convert it to 2D because mat is 2N by 2N;
-      double yita_middle[N - 2]; // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
+      double yita_middle[N - 1]; // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
       f0_given = (double*) malloc (N * sizeof(double)); // this is the ideal f0;
       double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
 
@@ -453,10 +457,10 @@ main ()
       // Convert yita_given to yita, because we are at a 2D problem, every node needs a associate yita value.
 
       get_f0_given (tau, L, N);
-      printf ("f0_given\n");
-      for (int i = 0; i < N; i++)
-	printf ("%f \n", f0_given[i]);
-      printf ("\n");
+//      printf ("f0_given\n");
+//      for (int i = 0; i < N; i++)
+//	printf ("%f \n", f0_given[i]);
+//      printf ("\n");
 
       // read data from file:
       FILE *file;
@@ -467,7 +471,7 @@ main ()
 	  return 1;
 	}
       char buff[255];
-      int line = 0;
+      int line = 1;
       double c, e;
       for (int i = 0; i < 10; i++)
 	fgets (buff, 255, (FILE*) file);
@@ -476,10 +480,13 @@ main ()
 	  sscanf (buff, "%lf %lf %lf %lf %lf", &c, &c, &e, &c, &c);
 	  yita_middle[line] = e;
 	  line++;
-	  if (line == N - 2)
+	  if (line == N - 1)
 	    break;
 	}
       fclose (file);
+
+//      for (int i = 0; i < N - 1; i++)
+//	printf ("yita_middle[%d]=%f \n", i, yita_middle[i]);
 
       int check = 1;
       qt = dmatrix (1, N - 2, 1, N - 2);
@@ -489,19 +496,14 @@ main ()
       err = 0.00000001;
       double* x_nr = dvector (1, N - 2);
       for (int i = 1; i < N - 1; i++)
-	x_nr[i] = yita_middle[i - 1];
+	x_nr[i] = yita_middle[i];
 
-      double* out = (double*) malloc (sizeof(double) * (N - 1));
-
-//      for (int i = 0; i < 4; i++)
-//	{
-//	  Step26::HeatEquation<2> heat_equation_solver (N, 2048, L, yita_middle);
-//	   heat_equation_solver.run ();
-//	}
+      for (int i = 0; i < N - 1; i++)
+	printf ("x_nr[%d]=%f \n", i, x_nr[i]);
 
       broydn (x_nr, N - 2, &check, SCFT_wrapper);
       for (int i = 1; i < N - 1; i++)
-	printf ("out[%d]=%0.16f \n", i, out[i]);
+	printf ("x_nr[%d]=%0.16f \n", i, x_nr[i]);
 
       free (yita_2D);
       free (yita_1D);
