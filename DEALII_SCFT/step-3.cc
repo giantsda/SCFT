@@ -214,8 +214,8 @@ namespace Step26
       solver.solve (system_matrix, solution, system_rhs,
 		    PreconditionIdentity ());
 
-      std::cout << "     " << solver_control.last_step () << " CG iterations."
-	  << std::endl;
+//      std::cout << "     " << solver_control.last_step () << " CG iterations."
+//	  << std::endl;
     }
 
   template<int dim>
@@ -264,16 +264,20 @@ namespace Step26
       yita_full_2D[1] = yita_full_1D[1];
       yita_full_2D[3] = yita_full_1D[1];
 
+      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..1\n");
 //      std::ofstream out ("grid-1.vtk");
 //      GridOut grid_out;
 //      grid_out.write_vtk (triangulation, out);
 //      std::cout << "Grid written to grid-1.vtk" << std::endl;
 
       setup_system ();
+      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..5\n");
       VectorTools::interpolate (dof_handler, Initial_condition<dim> (),
 				old_solution);
       solution = old_solution;
       output_results ();
+
+      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..2\n");
       std::vector<int> solution_table (N);
       for (int i = 0; i < N; i++)
 	{
@@ -301,7 +305,7 @@ namespace Step26
 	  system_matrix.add (time_step, laplace_matrix);
 	  tmp.copy_from (mass_matrix);
 
-	  printf ("tmp is a %d by %d mat \n", tmp.m (), tmp.m ());
+//	  printf ("tmp is a %d by %d mat \n", tmp.m (), tmp.m ());
 
 //	  std::ofstream out("haha.txt");
 //	  tmp.print (out);
@@ -339,6 +343,7 @@ namespace Step26
 		  solution[solution_table[i]];
 	    }
 	}
+      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..3\n");
 
       // write solution;
       FILE * fp;
@@ -367,15 +372,17 @@ namespace Step26
 		  * solution_store[i + 1][total_time_step - j - 1 - 1];
 	      f0[i] = f0[i] + 0.5 * time_step * (value_left + value_right);
 	    }
-	  printf ("%0.16f \n", f0[i]);
+//	  printf ("%0.16f \n", f0[i]);
 	}
+
+      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..6\n");
 
       Matfree (solution_store);
-      for (int i = 1; i <= N - 2; i++)
+      for (int i = 1; i < N - 1; i++)
 	{
-	  out[i] = f0[i] - f0_given[i];
+	  out[i] = f0_given[i] - f0[i];
 	}
-
+      printf (">>>>>>>>>>>>>>>>>>>>>>>>>>>..7\n");
       return out;
     }
 
@@ -409,16 +416,16 @@ myfun (int n, double * x, double * xnew)
 //	  xnew[1], xnew[2]);
 }
 
-
-
 void
 SCFT_wrapper (int N, double * in, double * out)
 {
+  double L = 3.72374;
 
+  Step26::HeatEquation<2> heat_equation_solver (N, 2048, L, in);
 
-;
-
-
+  double* res = heat_equation_solver.run ();
+  for (int i = 1; i < N - 1; i++)
+    out[i] = res[i];
 
 }
 
@@ -480,20 +487,30 @@ main ()
       for (int i = 1; i < N - 1; i++)
 	x_nr[i] = yita_middle[i - 1];
 
-//      broydn (x_nr, N - 2, &check, simple_FEM_1D_transient);
+      double* out = (double*) malloc (sizeof(double) * (N - 1));
+//      SCFT_wrapper (N, yita_middle, out);
+//      SCFT_wrapper (N, yita_middle, out);
 
-      broydn (x_nr, 2, &check, myfun);
+      for (int i = 0; i < 4; i++)
+	{
+	  Step26::HeatEquation<2> heat_equation_solver (N, 2048, L, yita_middle);
+	   heat_equation_solver.run ();
+	}
+
+//      broydn (x_nr, N - 2, &check, SCFT_wrapper);
+
+//      broydn (x_nr, 2, &check, myfun);
 
 //      void broydn(float x[], int n, int *check,
 //          void (*vecfunc)(int, float [], float []));
 
-      for (int i = 1; i < 5; i++)
-        printf (">>>>%f \n", x_nr[i]);
-      scanf ("%d", &de);
+//      for (int i = 1; i < 5; i++)
+//	printf (">>>>%f \n", x_nr[i]);
+//      scanf ("%d", &de);
 
-      HeatEquation<2> heat_equation_solver (N, 2048, L, yita_middle);
+//      HeatEquation<2> heat_equation_solver (N, 2048, L, yita_middle);
 
-      double* out = heat_equation_solver.run ();
+//      double* out = heat_equation_solver.run ();
 
       for (int i = 1; i < N - 1; i++)
 	printf ("out[%d]=%0.16f \n", i, out[i]);
