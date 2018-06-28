@@ -332,6 +332,8 @@ namespace Step26
 						    boundary_values);
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
 					      solution, system_rhs);
+//	  if (timestep_number == 1)
+//	    system_matrix.print (std::cout);
 	  solve_time_step ();
 //	  output_results ();
 	  old_solution = solution;
@@ -344,16 +346,17 @@ namespace Step26
 	}
 
       // write solution;
-      FILE * fp;
-      fp = fopen ("solution_store.txt", "w+");
-      for (int i = 0; i < N + 1; i++)
-	{
-	  for (int j = 0; j < total_time_step; j++)
-	    fprintf (fp, "%2.15f,", solution_store[i][j]);
-	  fprintf (fp, "\n");
-	}
 
-      fclose (fp);
+//      FILE * fp;
+//      fp = fopen ("solution_store.txt", "w+");
+//      for (int i = 0; i < N + 1; i++)
+//	{
+//	  for (int j = 0; j < total_time_step; j++)
+//	    fprintf (fp, "%2.15f,", solution_store[i][j]);
+//	  fprintf (fp, "\n");
+//	}
+//
+//      fclose (fp);
 
       //   integrate for f0
       //   TODO:change this to better integration method
@@ -414,17 +417,16 @@ myfun (int n, double * x, double * xnew)
 void
 SCFT_wrapper (int N, double * in, double * out)
 {
+  printf ("in: \n");
+  for (int i = 1; i < N - 1; i++)
+    printf ("in[%d]=%2.15f ; total_iteration:%d \n", i, in[i], total_iteration);
+
   double L = 3.72374;
   N = N + 2;
   Step26::HeatEquation<2> heat_equation_solver (N, 2048, L, in);
   double* res = heat_equation_solver.run ();
   for (int i = 1; i < N - 1; i++)
     out[i] = res[i];
-  printf ("total_iteration=%d!  \n", total_iteration);
-
-  printf ("in: \n");
-  for (int i = 1; i < N - 1; i++)
-    printf ("in[%d]=%2.15f ; total_iteration:%d \n", i, in[i], total_iteration);
   printf ("out: \n");
   for (int i = 1; i < N - 1; i++)
     printf ("out[%d]=%2.15f ; total_iteration:%d \n", i, out[i],
@@ -486,7 +488,7 @@ main ()
       fclose (file);
 
 //      for (int i = 0; i < N - 1; i++)
-//	printf ("yita_middle[%d]=%f \n", i, yita_middle[i]);
+//	yita_middle[i] = 0.;
 
       int check = 1;
       qt = dmatrix (1, N - 2, 1, N - 2);
@@ -496,8 +498,8 @@ main ()
       err = 0.00000001;
       double* x_nr = dvector (1, N - 2);
       for (int i = 1; i < N - 1; i++)
-	x_nr[i] = yita_middle[i];
-
+//	x_nr[i] = yita_middle[i];
+	x_nr[i] = 0.;
       for (int i = 0; i < N - 1; i++)
 	printf ("x_nr[%d]=%f \n", i, x_nr[i]);
 

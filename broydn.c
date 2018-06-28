@@ -113,10 +113,12 @@ broydn (float x[], int n, int *check, void
 		printf ("%f,", r[i][j]);
 	      printf ("\n");
 	    }
+	  int de;
+//	  printf("continue?\n");
+//	  scanf("%d",&de);
 	  if (funcerr)
 	    goto error;
 	  qrdcmp (r, n, c, d, &sing);
-	  int de;
 	  if (sing)
 	    {
 	      printf ("It is singlular \n ");
