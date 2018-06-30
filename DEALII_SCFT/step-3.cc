@@ -48,7 +48,7 @@
 
 #include <fstream>
 #include <iostream>
-
+#include <utility>
 #include "nr.h"
 #include "nrutil.h"
 
@@ -84,8 +84,15 @@ template<int dim>
 class HeatEquation
 {
 public:
+
 	HeatEquation(int N, int total_time_step, double L, double* yita);
-	bool first;
+	HeatEquation();
+
+	HeatEquation(HeatEquation&& other);
+	HeatEquation& operator =(HeatEquation &other);
+
+	~HeatEquation()=default;
+
 	double *
 	run();
 
@@ -126,6 +133,7 @@ private:
 	double* yita_full_1D;
 	double* yita_full_2D;
 	double* out;
+	bool first;
 };
 
 template<int dim>
@@ -166,6 +174,61 @@ HeatEquation<dim>::HeatEquation(int N, int total_time_step, double L,
 	yita_full_1D = (double*) malloc(sizeof(double) * N);
 	yita_full_2D = (double*) malloc(sizeof(double) * 2 * N);
 	out = (double*) malloc(sizeof(double) * (N - 1));
+}
+
+template<int dim>
+HeatEquation<dim>::HeatEquation() :
+		fe(1), dof_handler(triangulation)
+{
+}
+
+template<int dim>
+HeatEquation<dim>&
+HeatEquation<dim>::operator =(HeatEquation & other)
+
+{
+	first = other.first;
+	time = other.time;
+	time_step = 1. / 2047;
+	timestep_number = other.timestep_number;
+	N = other.N;
+	total_time_step = other.total_time_step;
+	L = other.L;
+	yita_middle_1D = other.yita_middle_1D;
+	time_step = 1. / (total_time_step - 1);
+	solution_store = other.solution_store;
+	f0 = other.f0;
+	yita_full_1D = other.yita_full_1D;
+	yita_full_2D = other.yita_full_2D;
+	out = other.out;
+
+	other.solution_store = nullptr;
+	other.yita_full_1D = nullptr;
+	other.yita_full_2D = nullptr;
+	other.out = nullptr;
+
+}
+
+template<int dim>
+HeatEquation<dim>::HeatEquation(HeatEquation&& other) :
+		first(other.first), fe(other.fe), dof_handler(other.dof_handler), time(
+				other.time), time_step(1. / 2047), timestep_number(
+				other.timestep_number), N(other.N), total_time_step(
+				other.total_time_step), L(other.L), yita_middle_1D(
+				other.yita_middle_1D)
+{
+	time_step = 1. / (total_time_step - 1);
+	solution_store = other.solution_store;
+	f0 = other.f0;
+	yita_full_1D = other.yita_full_1D;
+	yita_full_2D = other.yita_full_2D;
+	out = other.out;
+
+	other.solution_store = nullptr;
+	other.yita_full_1D = nullptr;
+	other.yita_full_2D = nullptr;
+	other.out = nullptr;
+
 }
 
 template<int dim>
@@ -417,6 +480,8 @@ void myfun(int n, double * x, double * xnew)
 //	  xnew[1], xnew[2]);
 }
 
+Step26::HeatEquation<2> heat_equation_solver;
+
 void SCFT_wrapper(int N, double * in, double * out)
 {
 	printf("in: \n");
@@ -426,7 +491,6 @@ void SCFT_wrapper(int N, double * in, double * out)
 
 	double L = 3.72374;
 	N = N + 2;
-	Step26::HeatEquation<2> heat_equation_solver(N, 2048, L, in);
 	double* res = heat_equation_solver.run();
 	for (int i = 1; i < N - 1; i++)
 		out[i] = res[i];
@@ -461,7 +525,6 @@ int main()
 		// Convert yita_given to yita, because we are at a 2D problem, every node needs a associate yita value.
 
 		get_f0_given(tau, L, N);
-
 
 //      printf ("f0_given\n");
 //      for (int i = 0; i < N; i++)
@@ -507,10 +570,12 @@ int main()
 		for (int i = 0; i < N - 1; i++)
 			printf("x_nr[%d]=%f \n", i, x_nr[i]);
 
-		Step26::HeatEquation<2> heat_equation_solver(N, 2048, L, x_nr);
-		x_nr = heat_equation_solver.run();
-
-//		broydn(x_nr, N - 2, &check, SCFT_wrapper);
+		Step26::HeatEquation<2> other(N, 2048, L, x_nr);
+		heat_equation_solver = other;
+//		Step26::HeatEquation<2> heat_equation_solver(N, 2048, L, x_nr);
+//		x_nr = heat_equation_solver.run();
+//		other.~HeatEquation();
+		broydn(x_nr, N - 2, &check, SCFT_wrapper);
 
 		for (int i = 1; i < N - 1; i++)
 			printf("x_nr[%d]=%0.16f \n", i, x_nr[i]);
