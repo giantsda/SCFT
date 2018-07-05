@@ -107,6 +107,12 @@ namespace Step26
 	return N;
       }
       ;
+      void
+      set_yita_middle_1D (double * in)
+      {
+	yita_middle_1D = in;
+      }
+      ;
       double *
       run ();
       void
@@ -294,7 +300,7 @@ namespace Step26
     void
     HeatEquation<dim>::solve_time_step ()
     {
-      SolverControl solver_control (8000, 1e-13);
+      SolverControl solver_control (80000, 1e-8);
       SolverCG<> solver (solver_control);
       solver.solve (system_matrix, solution, system_rhs,
 		    PreconditionIdentity ());
@@ -412,15 +418,26 @@ namespace Step26
     {
       time = 0.;
       timestep_number = 0;
-      setup_system ();
-      N = dof_handler.n_dofs () / 2;
-      printf ("N=%d\n", N);
+//      setup_system ();
+      N = triangulation.n_active_cells () + 1;
+//      int N2 = dof_handler.n_dofs () / 2;
+
+      printf ("N=%d  \n", N);
       Matfree (solution_store);
       solution_store = Matcreate (N + 1, total_time_step + 1);
       f0 = (double*) realloc (f0, sizeof(double) * N);
       yita_full_1D = (double*) realloc (yita_full_1D, sizeof(double) * N);
       yita_full_2D = (double*) realloc (yita_full_2D, sizeof(double) * 2 * N);
       out = (double*) realloc (out, sizeof(double) * (N - 1));
+
+      free_dmatrix (qt, 1, N - 2, 1, N - 2);
+      qt = dmatrix (1, N - 2, 1, N - 2);
+      free_dmatrix (r, 1, N - 2, 1, N - 2);
+      r = dmatrix (1, N - 2, 1, N - 2);
+      free_dvector (d, 1, N - 2);
+      d = dvector (1, N - 2);
+      jc = 0;
+      err = 0.00000001;
     }
 
   template<int dim>
@@ -437,7 +454,6 @@ namespace Step26
 	  GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,
 						     Point<2> (0.0, 0.0),
 						     Point<2> (L, L / N), true);
-
 	  refine_times++;
 	}
       std::cout << "Number of active cells: " << triangulation.n_active_cells ()
@@ -449,6 +465,7 @@ namespace Step26
       yita_full_1D[0] = 0.;
       yita_full_1D[N - 1] = 0.;
 
+//      scanf ("%d", &de);
 //      for (int i = 0; i < N; i++)
 //	printf ("yita_full_1D[%d]=%f\n", i, yita_full_1D[i]);
 
@@ -504,6 +521,13 @@ namespace Step26
 	  system_matrix.add (time_step, laplace_matrix);
 	  tmp.copy_from (mass_matrix);
 
+//	  if (refine_times == 2)
+//	    {
+//	      system_matrix.print (std::cout);
+//	      system_rhs.print (std::cout);
+//	      scanf ("%d", &de);
+//	    }
+
 //	  printf ("tmp is a %d by %d mat \n", tmp.m (), tmp.m ());
 
 //	  std::ofstream out("haha.txt");
@@ -515,11 +539,18 @@ namespace Step26
 		  tmp.end (i);
 	      for (; begin != end; ++begin)
 		{
+//		  printf ("yita_full_2D[%d]=%f \n", i, yita_full_2D[i]);
 		  begin->value () *= yita_full_2D[i];
 		}
 	    }
 
 	  system_matrix.add (time_step, tmp);
+//	  if (refine_times == 2)
+//	    {
+//	      system_matrix.print (std::cout);
+//	      system_rhs.print (std::cout);
+//	      scanf ("%d", &de);
+//	    }
 	  mass_matrix.vmult (system_rhs, old_solution);
 	  std::map<types::global_dof_index, double> boundary_values;
 	  VectorTools::interpolate_boundary_values (dof_handler, 0,
@@ -534,6 +565,13 @@ namespace Step26
 					      solution, system_rhs);
 //	  if (timestep_number == 1)
 //	    system_matrix.print (std::cout);
+//	  if (total_iteration >= 79)
+//	    {
+//	      system_matrix.print (std::cout);
+//	      system_rhs.print (std::cout);
+////	      scanf ("%d", &de);
+//	    }
+
 	  solve_time_step ();
 //	  output_results ();
 	  old_solution = solution;
@@ -546,17 +584,19 @@ namespace Step26
 	}
 
       // write solution;
+      if (refine_times == 2)
+	{
+	  FILE * fp;
+	  fp = fopen ("solution_store.txt", "w+");
+	  for (int i = 0; i < N + 1; i++)
+	    {
+	      for (int j = 0; j < total_time_step; j++)
+		fprintf (fp, "%2.15f,", solution_store[i][j]);
+	      fprintf (fp, "\n");
+	    }
 
-//      FILE * fp;
-//      fp = fopen ("solution_store.txt", "w+");
-//      for (int i = 0; i < N + 1; i++)
-//	{
-//	  for (int j = 0; j < total_time_step; j++)
-//	    fprintf (fp, "%2.15f,", solution_store[i][j]);
-//	  fprintf (fp, "\n");
-//	}
-//
-//      fclose (fp);
+	  fclose (fp);
+	}
 
 //   integrate for f0
 //   TODO:change this to better integration method
@@ -644,6 +684,8 @@ get_f0_given (double tau, double L, int N)
       f0_given[i] = pow ((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) - 1),
 			 2)
 	  / pow (((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) + 1)), 2);
+      if (std::isnan (f0_given[i]))
+	f0_given[i] = 1.;
       f0_given[N - i - 1] = f0_given[i];
     }
 }
@@ -664,8 +706,7 @@ SCFT_wrapper (int N, double * in, double * out)
 {
   N = N + 2;
   for (int i = 1; i < N - 1; i++)
-    printf ("in[%d]=%f \n", i, in[i]);
-
+    printf ("in[%d]=%2.15f \n", i, in[i]);
   printf ("CONTINUE>>>>>>>>>>>>>>>\n");
   double* res = heat_equation_solver.run ();
 
@@ -762,6 +803,7 @@ main ()
       x_nr = dvector (1, N - 2);
       for (int i = 1; i < N - 1; i++)
 	x_nr[i] = 0.;
+      heat_equation_solver.set_yita_middle_1D (x_nr);
       broydn (x_nr, N - 2, &check, SCFT_wrapper);
 
 //      for (int i = 0; i < 5; i++)
