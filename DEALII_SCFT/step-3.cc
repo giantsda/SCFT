@@ -95,10 +95,26 @@ namespace Step26
       void
       print_point ();
       ~HeatEquation () = default;
-
+      int
+      get_refine_times ()
+      {
+	return refine_times;
+      }
+      ;
+      int
+      get_N ()
+      {
+	return N;
+      }
+      ;
       double *
       run ();
-
+      void
+      run_experiemnt ();
+      void
+      refine_mesh ();
+      void
+      update_internal_data ();
     private:
       void
       setup_system ();
@@ -106,8 +122,9 @@ namespace Step26
       solve_time_step ();
       void
       output_results () const;
+
       void
-      refine_mesh ();
+      output_results_for_yita_full_2D_t () const;
 
       Triangulation<dim> triangulation;
       FE_Q<dim> fe;
@@ -136,7 +153,7 @@ namespace Step26
       double* yita_full_1D;
       double* yita_full_2D;
       double* out;
-      bool first;
+      int refine_times;
     };
 
   template<int dim>
@@ -168,7 +185,7 @@ namespace Step26
   template<int dim>
     HeatEquation<dim>::HeatEquation (int N, int total_time_step, double L,
 				     double* yita) :
-	first (true), fe (1), dof_handler (triangulation), time (0.0), time_step (
+	refine_times (0), fe (1), dof_handler (triangulation), time (0.0), time_step (
 	    1. / 2047), timestep_number (0), N (N), total_time_step (
 	    total_time_step), L (L), yita_middle_1D (yita)
     {
@@ -191,7 +208,7 @@ namespace Step26
     HeatEquation<dim>::operator = (HeatEquation & other)
 
     {
-      first = other.first;
+      refine_times = other.refine_times;
       time = other.time;
       time_step = 1. / 2047;
       timestep_number = other.timestep_number;
@@ -215,8 +232,8 @@ namespace Step26
 
   template<int dim>
     HeatEquation<dim>::HeatEquation (HeatEquation&& other) :
-	first (other.first), fe (other.fe), dof_handler (other.dof_handler), time (
-	    other.time), time_step (1. / 2047), timestep_number (
+	refine_times (other.refine_times), fe (other.fe), dof_handler (
+	    other.dof_handler), time (other.time), time_step (1. / 2047), timestep_number (
 	    other.timestep_number), N (other.N), total_time_step (
 	    other.total_time_step), L (other.L), yita_middle_1D (
 	    other.yita_middle_1D)
@@ -289,14 +306,53 @@ namespace Step26
     void
     HeatEquation<dim>::refine_mesh ()
     {
+
+      output_results_for_yita_full_2D_t ();
+
 #undef float
       Vector<float> estimated_error_per_cell (triangulation.n_active_cells ());
+      Vector<double> yita_full_2D_t (N * 2);
+
+      for (int i = 0; i < 2 * N; i++)
+	yita_full_2D_t[i] = yita_full_2D[i];
+
+      for (int i = 0; i < 2 * N; i++)
+	printf ("yita_full_2D_t[%d]=%f\n", i, yita_full_2D_t[i]);
 
       KellyErrorEstimator<dim>::estimate (dof_handler,
 					  QGauss<dim - 1> (fe.degree + 1),
 					  typename FunctionMap<dim>::type (),
-					  solution, estimated_error_per_cell);
+					  yita_full_2D_t,
+					  estimated_error_per_cell);
+
 #define float double
+
+      for (int i = 0; i < estimated_error_per_cell.size (); i++)
+	printf ("estimated_error_per_cell[%d]=%f\n", i,
+		estimated_error_per_cell[i]);
+
+//      GridRefinement::refine_and_coarsen_fixed_fraction (
+//	  triangulation, estimated_error_per_cell, 1., 0.0);
+
+      GridRefinement::refine (triangulation, estimated_error_per_cell, 0.50,
+			      200);
+
+      typename DoFHandler<dim>::active_cell_iterator cell =
+	  dof_handler.begin_active (), endc = dof_handler.end ();
+
+      for (cell = dof_handler.begin_active (); cell != endc; ++cell)
+	{
+
+	  if (cell->refine_flag_set ())
+	    {
+	      cell->set_refine_flag (RefinementCase<dim>::cut_axis (0));
+//	      printf ("cell is refined!!! \n");
+	    }
+	}
+
+      triangulation.execute_coarsening_and_refinement ();
+      refine_times++;
+
     }
 
   template<int dim>
@@ -328,12 +384,52 @@ namespace Step26
     }
 
   template<int dim>
+    void
+    HeatEquation<dim>::output_results_for_yita_full_2D_t () const
+    {
+      Vector<double> yita_full_2D_t (N * 2);
+
+      for (int i = 0; i < 2 * N; i++)
+	{
+	  yita_full_2D_t[i] = yita_full_2D[i];
+	}
+      DataOut<dim> data_out;
+
+      data_out.attach_dof_handler (dof_handler);
+      data_out.add_data_vector (yita_full_2D_t, "U");
+
+      data_out.build_patches ();
+
+      const std::string filename = "yita_full_2D-"
+	  + Utilities::int_to_string (refine_times, 3) + ".vtk";
+      std::ofstream output (filename.c_str ());
+      data_out.write_vtk (output);
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::update_internal_data ()
+    {
+      time = 0.;
+      timestep_number = 0;
+      setup_system ();
+      N = dof_handler.n_dofs () / 2;
+      printf ("N=%d\n", N);
+      Matfree (solution_store);
+      solution_store = Matcreate (N + 1, total_time_step + 1);
+      f0 = (double*) realloc (f0, sizeof(double) * N);
+      yita_full_1D = (double*) realloc (yita_full_1D, sizeof(double) * N);
+      yita_full_2D = (double*) realloc (yita_full_2D, sizeof(double) * 2 * N);
+      out = (double*) realloc (out, sizeof(double) * (N - 1));
+    }
+
+  template<int dim>
     double *
     HeatEquation<dim>::run ()
     {
 
       int de;
-      if (first == true)
+      if (refine_times == 0)
 	{
 	  std::vector<unsigned int> repetitions;
 	  repetitions.push_back (N - 1);
@@ -342,7 +438,7 @@ namespace Step26
 						     Point<2> (0.0, 0.0),
 						     Point<2> (L, L / N), true);
 
-	  first = false;
+	  refine_times++;
 	}
       std::cout << "Number of active cells: " << triangulation.n_active_cells ()
 	  << std::endl;
@@ -352,6 +448,10 @@ namespace Step26
 	yita_full_1D[i] = yita_middle_1D[i];
       yita_full_1D[0] = 0.;
       yita_full_1D[N - 1] = 0.;
+
+//      for (int i = 0; i < N; i++)
+//	printf ("yita_full_1D[%d]=%f\n", i, yita_full_1D[i]);
+
       for (int i = 2; i < N; i++)
 	{
 	  yita_full_2D[2 * i] = yita_full_1D[i];
@@ -387,9 +487,7 @@ namespace Step26
 
       for (int i = 2; i < N; i++)
 	{
-	  printf ("i=%d", i);
 	  solution_store[i][0] = 1.;
-
 	}
       int period = 1;
       for (timestep_number = 1; timestep_number < total_time_step;
@@ -486,6 +584,49 @@ namespace Step26
       return out;
     }
 
+  template<int dim>
+    void
+    HeatEquation<dim>::run_experiemnt ()
+    {
+      int de;
+      if (refine_times == 0)
+	{
+	  std::vector<unsigned int> repetitions;
+	  repetitions.push_back (N - 1);
+	  repetitions.push_back (1);
+	  GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,
+						     Point<2> (0.0, 0.0),
+						     Point<2> (L, L / N), true);
+
+	  refine_times++;
+	}
+
+      std::cout << "Number of active cells: " << triangulation.n_active_cells ()
+	  << std::endl;
+
+      setup_system ();
+
+      // convert yita_middle_1D to yita_full_2D;
+      for (int i = 1; i < N - 1; i++)
+	yita_full_1D[i] = i;
+      yita_full_1D[0] = 0.;
+      yita_full_1D[N - 1] = 0.;
+
+      //      for (int i = 0; i < N; i++)
+      //	printf ("yita_full_1D[%d]=%f\n", i, yita_full_1D[i]);
+
+      for (int i = 2; i < N; i++)
+	{
+	  yita_full_2D[2 * i] = yita_full_1D[i];
+	  yita_full_2D[2 * i + 1] = yita_full_1D[i];
+	}
+      yita_full_2D[0] = yita_full_1D[0];
+      yita_full_2D[2] = yita_full_1D[0];
+      yita_full_2D[1] = yita_full_1D[1];
+      yita_full_2D[3] = yita_full_1D[1];
+
+    }
+
 }
 
 void
@@ -521,23 +662,25 @@ Step26::HeatEquation<2> heat_equation_solver;
 void
 SCFT_wrapper (int N, double * in, double * out)
 {
-  printf ("in: \n");
-  for (int i = 1; i < N - 1; i++)
-    printf ("in[%d]=%2.15f ; total_iteration:%d \n", i, in[i], total_iteration);
-
-  double L = 3.72374;
   N = N + 2;
+  for (int i = 1; i < N - 1; i++)
+    printf ("in[%d]=%f \n", i, in[i]);
+
+  printf ("CONTINUE>>>>>>>>>>>>>>>\n");
   double* res = heat_equation_solver.run ();
+
   for (int i = 1; i < N - 1; i++)
     out[i] = res[i];
-  printf ("out: \n");
+
   for (int i = 1; i < N - 1; i++)
-    printf ("out[%d]=%2.15f ; total_iteration:%d \n", i, out[i],
-	    total_iteration);
+    printf (
+	"in[%d]=%2.15f ; out[%d]=%2.15f ; total_iteration:%d refine_times:%d \n",
+	i, in[i], i, out[i], total_iteration,
+	heat_equation_solver.get_refine_times ());
   fflush (stdout);
   total_iteration++;
-  int de;
 
+  int de;
 //  scanf ("%d", &de);
 
 }
@@ -553,7 +696,7 @@ main ()
       int de;
       double* yita_1D = (double*) malloc (N * sizeof(double)); // this is the yita for 1D, length=N;
       double* yita_2D = (double*) malloc (N * sizeof(double) * 2); // need to convert it to 2D because mat is 2N by 2N;
-      double yita_middle[N - 1]; // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
+      double* yita_middle = (double*) malloc ((N - 1) * sizeof(double) * 2); // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
       f0_given = (double*) malloc (N * sizeof(double)); // this is the ideal f0;
       double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
 
@@ -568,31 +711,28 @@ main ()
 //	printf ("%f \n", f0_given[i]);
 //      printf ("\n");
 
-//		// read data from file:
-//		FILE *file;
-//		file = fopen("Exp_m32_n2048_IE.res", "r");
-//		if (file == NULL)
-//		{
-//			fprintf(stderr, "Can't open input file in.list!\n");
-//			return 1;
-//		}
-//		char buff[255];
-//		int line = 1;
-//		double c, e;
-//		for (int i = 0; i < 10; i++)
-//			fgets(buff, 255, (FILE*) file);
-//		while (fgets(buff, 255, (FILE*) file))
-//		{
-//			sscanf(buff, "%lf %lf %lf %lf %lf", &c, &c, &e, &c, &c);
-//			yita_middle[line] = e;
-//			line++;
-//			if (line == N - 1)
-//				break;
-//		}
-//		fclose(file);
-
-//      for (int i = 0; i < N - 1; i++)
-//	yita_middle[i] = 0.;
+      // read data from file:
+      FILE *file;
+      file = fopen ("Exp_m32_n2048_IE.res", "r");
+      if (file == NULL)
+	{
+	  fprintf (stderr, "Can't open input file in.list!\n");
+	  return 1;
+	}
+      char buff[255];
+      int line = 1;
+      double c, e;
+      for (int i = 0; i < 10; i++)
+	fgets (buff, 255, (FILE*) file);
+      while (fgets (buff, 255, (FILE*) file))
+	{
+	  sscanf (buff, "%lf %lf %lf %lf %lf", &c, &c, &e, &c, &c);
+	  yita_middle[line] = e;
+	  line++;
+	  if (line == N - 1)
+	    break;
+	}
+      fclose (file);
 
       int check = 1;
       qt = dmatrix (1, N - 2, 1, N - 2);
@@ -602,20 +742,34 @@ main ()
       err = 0.00000001;
       double* x_nr = dvector (1, N - 2);
       for (int i = 1; i < N - 1; i++)
-//	x_nr[i] = yita_middle[i];
-	x_nr[i] = 0.;
+	x_nr[i] = yita_middle[i];
+//	x_nr[i] = 0.;
       for (int i = 0; i < N - 1; i++)
 	printf ("x_nr[%d]=%f \n", i, x_nr[i]);
 
-      Step26::HeatEquation<2> other (N, 2048, L, x_nr);
+      Step26::HeatEquation<2> other (N, 2048, L, x_nr); // This tells the yita_middle_1D and x_nr has the same address;
 
       heat_equation_solver = other;
+      /*The assignment constructor transfer the address of x_nr
+       to heat_equation_solver.yita_middle_1D*/
 
-//		Step26::HeatEquation<2> heat_equation_solver(N, 2048, L, x_nr);
-//		x_nr = heat_equation_solver.run();
 //		other.~HeatEquation();
-
       broydn (x_nr, N - 2, &check, SCFT_wrapper);
+      heat_equation_solver.refine_mesh ();
+      heat_equation_solver.update_internal_data ();
+      free_dvector (x_nr, 1, N - 2);
+      N = heat_equation_solver.get_N ();
+      x_nr = dvector (1, N - 2);
+      for (int i = 1; i < N - 1; i++)
+	x_nr[i] = 0.;
+      broydn (x_nr, N - 2, &check, SCFT_wrapper);
+
+//      for (int i = 0; i < 5; i++)
+//	{
+//	  heat_equation_solver.run ();
+//	  heat_equation_solver.refine_mesh ();
+//	  heat_equation_solver.update_internal_data ();
+//	}
 
       for (int i = 1; i < N - 1; i++)
 	printf ("x_nr[%d]=%0.16f \n", i, x_nr[i]);
