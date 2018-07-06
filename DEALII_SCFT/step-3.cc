@@ -101,6 +101,12 @@ namespace Step26
 	return refine_times;
       }
       ;
+      void
+      set_refine_times (int a)
+      {
+	refine_times = a;
+      }
+      ;
       int
       get_N ()
       {
@@ -300,7 +306,7 @@ namespace Step26
     void
     HeatEquation<dim>::solve_time_step ()
     {
-      SolverControl solver_control (80000, 1e-8);
+      SolverControl solver_control (80000, 1e-13);
       SolverCG<> solver (solver_control);
       solver.solve (system_matrix, solution, system_rhs,
 		    PreconditionIdentity ());
@@ -349,7 +355,7 @@ namespace Step26
       for (cell = dof_handler.begin_active (); cell != endc; ++cell)
 	{
 
-	  if (cell->refine_flag_set ())
+//	  if (cell->refine_flag_set ())
 	    {
 	      cell->set_refine_flag (RefinementCase<dim>::cut_axis (0));
 //	      printf ("cell is refined!!! \n");
@@ -584,19 +590,19 @@ namespace Step26
 	}
 
       // write solution;
-      if (refine_times == 2)
-	{
-	  FILE * fp;
-	  fp = fopen ("solution_store.txt", "w+");
-	  for (int i = 0; i < N + 1; i++)
-	    {
-	      for (int j = 0; j < total_time_step; j++)
-		fprintf (fp, "%2.15f,", solution_store[i][j]);
-	      fprintf (fp, "\n");
-	    }
-
-	  fclose (fp);
-	}
+//      if (refine_times == 2)
+//	{
+//	  FILE * fp;
+//	  fp = fopen ("solution_store.txt", "w+");
+//	  for (int i = 0; i < N + 1; i++)
+//	    {
+//	      for (int j = 0; j < total_time_step; j++)
+//		fprintf (fp, "%2.15f,", solution_store[i][j]);
+//	      fprintf (fp, "\n");
+//	    }
+//
+//	  fclose (fp);
+//	}
 
 //   integrate for f0
 //   TODO:change this to better integration method
@@ -705,9 +711,9 @@ void
 SCFT_wrapper (int N, double * in, double * out)
 {
   N = N + 2;
-  for (int i = 1; i < N - 1; i++)
-    printf ("in[%d]=%2.15f \n", i, in[i]);
-  printf ("CONTINUE>>>>>>>>>>>>>>>\n");
+//  for (int i = 1; i < N - 1; i++)
+//    printf ("in[%d]=%2.15f \n", i, in[i]);
+//  printf ("CONTINUE>>>>>>>>>>>>>>>\n");
   double* res = heat_equation_solver.run ();
 
   for (int i = 1; i < N - 1; i++)
@@ -721,8 +727,9 @@ SCFT_wrapper (int N, double * in, double * out)
   fflush (stdout);
   total_iteration++;
 
-  int de;
-//  scanf ("%d", &de);
+//  int de;
+//  if (heat_equation_solver.get_refine_times () == 2)
+//    scanf ("%d", &de);
 
 }
 
@@ -783,8 +790,8 @@ main ()
       err = 0.00000001;
       double* x_nr = dvector (1, N - 2);
       for (int i = 1; i < N - 1; i++)
-	x_nr[i] = yita_middle[i];
-//	x_nr[i] = 0.;
+//	x_nr[i] = yita_middle[i];
+	x_nr[i] = 0.;
       for (int i = 0; i < N - 1; i++)
 	printf ("x_nr[%d]=%f \n", i, x_nr[i]);
 
@@ -795,26 +802,22 @@ main ()
        to heat_equation_solver.yita_middle_1D*/
 
 //		other.~HeatEquation();
-      broydn (x_nr, N - 2, &check, SCFT_wrapper);
-      heat_equation_solver.refine_mesh ();
-      heat_equation_solver.update_internal_data ();
-      free_dvector (x_nr, 1, N - 2);
-      N = heat_equation_solver.get_N ();
-      x_nr = dvector (1, N - 2);
-      for (int i = 1; i < N - 1; i++)
-	x_nr[i] = 0.;
-      heat_equation_solver.set_yita_middle_1D (x_nr);
-      broydn (x_nr, N - 2, &check, SCFT_wrapper);
 
-//      for (int i = 0; i < 5; i++)
-//	{
-//	  heat_equation_solver.run ();
-//	  heat_equation_solver.refine_mesh ();
-//	  heat_equation_solver.update_internal_data ();
-//	}
-
-      for (int i = 1; i < N - 1; i++)
-	printf ("x_nr[%d]=%0.16f \n", i, x_nr[i]);
+      for (int u = 0; u < 3; u++)
+	{
+	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
+	  heat_equation_solver.refine_mesh ();
+	  heat_equation_solver.update_internal_data ();
+	  free_dvector (x_nr, 1, N - 2);
+	  N = heat_equation_solver.get_N ();
+	  x_nr = dvector (1, N - 2);
+	  for (int i = 1; i < N - 1; i++)
+	    x_nr[i] = 0.;
+	  heat_equation_solver.set_yita_middle_1D (x_nr);
+	  f0_given = (double*) realloc (f0_given, N * sizeof(double));
+	  get_f0_given (tau, L, N);
+	  total_iteration = 0;
+	}
 
       free (yita_2D);
       free (yita_1D);
