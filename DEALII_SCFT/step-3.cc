@@ -96,7 +96,8 @@ namespace Step26
       ~HeatEquation () = default;
       int
       get_refine_times ();
-
+      std::vector<double> &
+      get_x (std::vector<double> & in);
       void
       set_refine_times (int a);
       int
@@ -232,6 +233,29 @@ namespace Step26
     {
       return refine_times;
     }
+
+  template<int dim>
+    std::vector<double> &
+    HeatEquation<dim>::get_x (std::vector<double> & in)
+    {
+      typename Triangulation<dim>::active_vertex_iterator vertex =
+	  triangulation.begin_active_vertex (), endv =
+	  triangulation.end_vertex ();
+      int i = 0;
+      Point<2> p;
+      for (; vertex != endv; vertex++)
+	{
+	  p = vertex->vertex (1);
+	  if (p (1) == 0)
+	    {
+	      in[i] = p (0);
+	      i++;
+	    }
+	}
+      std::sort (in.begin (), in.end ());
+      return in;
+    }
+
   template<int dim>
     void
     HeatEquation<dim>::set_refine_times (int a)
@@ -365,12 +389,8 @@ namespace Step26
 
       for (cell = dof_handler.begin_active (); cell != endc; ++cell)
 	{
-
-//	  if (cell->refine_flag_set ())
-	    {
-	      cell->set_refine_flag (RefinementCase<dim>::cut_axis (0));
-//	      printf ("cell is refined!!! \n");
-	    }
+	  if (cell->refine_flag_set ())
+	    cell->set_refine_flag (RefinementCase<dim>::cut_axis (0));
 	}
 
       triangulation.execute_coarsening_and_refinement ();
@@ -404,6 +424,7 @@ namespace Step26
 	  + Utilities::int_to_string (timestep_number, 3) + ".vtk";
       std::ofstream output (filename.c_str ());
       data_out.write_vtk (output);
+      printf("%s is written \n",filename.c_str ());
     }
 
   template<int dim>
@@ -687,26 +708,28 @@ namespace Step26
 }
 
 void
-get_f0_given (double tau, double L, int N)
+get_f0_given (double tau, double L, int N, std::vector<double> & x)
 {
-  double x[N];
+
+  for (int i = 0; i < N; i++)
+    f0_given[i] = 1.;
   for (int i = 0; i < N; i++)
     {
-      f0_given[i] = 1.;
-      x[i] = i * L / (N - 1);
-    }
-  int x_left = ceil (N * tau / L);
-  for (int i = 0; i < x_left; i++)
-    {
-      f0_given[i] = pow ((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) - 1),
-			 2)
-	  / pow (((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) + 1)), 2);
-      if (std::isnan (f0_given[i]))
-	f0_given[i] = 1.;
+      if (x[i] <= tau)
+	{
+	  f0_given[i] = pow (
+	      (exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) - 1), 2)
+	      / pow (((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) + 1)),
+		     2);
+	  if (std::isnan (f0_given[i]))
+	    f0_given[i] = 1.;
 
-      f0_given[N - i - 1] = f0_given[i];
-    }
+	  f0_given[N - i - 1] = f0_given[i];
 
+	}
+      else
+	break;
+    }
 }
 
 void
@@ -761,12 +784,10 @@ main ()
       double* yita_middle = (double*) malloc ((N - 1) * sizeof(double) * 2); // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
       f0_given = (double*) malloc (N * sizeof(double)); // this is the ideal f0;
       double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
-
+      std::vector<double> x;
       for (int i = 0; i < N; i++)
 	yita_1D[i] = i;
       // Convert yita_given to yita, because we are at a 2D problem, every node needs a associate yita value.
-
-      get_f0_given (tau, L, N);
 
 //      printf ("f0_given\n");
 //      for (int i = 0; i < N; i++)
@@ -804,8 +825,8 @@ main ()
       err = 0.00000001;
       double* x_nr = dvector (1, N - 2);
       for (int i = 1; i < N - 1; i++)
-//	x_nr[i] = yita_middle[i];
-	x_nr[i] = 0.;
+	x_nr[i] = yita_middle[i];
+//	x_nr[i] = 0.;
       for (int i = 0; i < N - 1; i++)
 	printf ("x_nr[%d]=%f \n", i, x_nr[i]);
 
@@ -814,6 +835,13 @@ main ()
       heat_equation_solver = other;
       /*The assignment constructor transfer the address of x_nr
        to heat_equation_solver.yita_middle_1D*/
+
+      x.resize (N);
+      for (int i = 0; i < N; i++)
+	{
+	  x[i] = i * L / (N - 1);
+	}
+      get_f0_given (tau, L, N, x);
 
 //		other.~HeatEquation();
       for (int u = 0; u < 500; u++)
@@ -828,7 +856,12 @@ main ()
 	    x_nr[i] = 0.;
 	  heat_equation_solver.set_yita_middle_1D (x_nr);
 	  f0_given = (double*) realloc (f0_given, N * sizeof(double));
-	  get_f0_given (tau, L, N);
+	  x.resize (heat_equation_solver.get_N ());
+	  heat_equation_solver.get_x (x);
+	  for (auto u : x)
+	    printf ("%f \n", u);
+
+	  get_f0_given (tau, L, N, x);
 	  total_iteration = 0;
 	}
 
