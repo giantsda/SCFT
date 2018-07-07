@@ -95,29 +95,14 @@ namespace Step26
       print_point ();
       ~HeatEquation () = default;
       int
-      get_refine_times ()
-      {
-	return refine_times;
-      }
-      ;
+      get_refine_times ();
+
       void
-      set_refine_times (int a)
-      {
-	refine_times = a;
-      }
-      ;
+      set_refine_times (int a);
       int
-      get_N ()
-      {
-	return N;
-      }
-      ;
+      get_N ();
       void
-      set_yita_middle_1D (double * in)
-      {
-	yita_middle_1D = in;
-      }
-      ;
+      set_yita_middle_1D (double * in);
       double *
       run ();
       void
@@ -239,6 +224,33 @@ namespace Step26
       other.yita_full_2D = nullptr;
       other.out = nullptr;
 
+    }
+
+  template<int dim>
+    int
+    HeatEquation<dim>::get_refine_times ()
+    {
+      return refine_times;
+    }
+  template<int dim>
+    void
+    HeatEquation<dim>::set_refine_times (int a)
+    {
+      refine_times = a;
+    }
+
+  template<int dim>
+    int
+    HeatEquation<dim>::get_N ()
+    {
+      return N;
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::set_yita_middle_1D (double * in)
+    {
+      yita_middle_1D = in;
     }
 
   template<int dim>
@@ -692,10 +704,8 @@ get_f0_given (double tau, double L, int N)
       if (std::isnan (f0_given[i]))
 	f0_given[i] = 1.;
 
-
       f0_given[N - i - 1] = f0_given[i];
     }
-
 
 }
 
@@ -744,7 +754,7 @@ main ()
     {
       using namespace dealii;
       using namespace Step26;
-      int N = 163;
+      int N = 33;
       int de;
       double* yita_1D = (double*) malloc (N * sizeof(double)); // this is the yita for 1D, length=N;
       double* yita_2D = (double*) malloc (N * sizeof(double) * 2); // need to convert it to 2D because mat is 2N by 2N;
@@ -758,12 +768,10 @@ main ()
 
       get_f0_given (tau, L, N);
 
-
 //      printf ("f0_given\n");
 //      for (int i = 0; i < N; i++)
 //	printf ("%f \n", f0_given[i]);
 //      printf ("\n");
-
 
       // read data from file:
       FILE *file;
@@ -808,8 +816,7 @@ main ()
        to heat_equation_solver.yita_middle_1D*/
 
 //		other.~HeatEquation();
-
-      for (int u = 0; u < 3; u++)
+      for (int u = 0; u < 500; u++)
 	{
 	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
 	  heat_equation_solver.refine_mesh ();
