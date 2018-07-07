@@ -45,7 +45,6 @@
 #include <deal.II/numerics/error_estimator.h>
 #include <deal.II/numerics/solution_transfer.h>
 #include <deal.II/numerics/matrix_tools.h>
-
 #include <fstream>
 #include <iostream>
 #include <utility>
@@ -692,8 +691,12 @@ get_f0_given (double tau, double L, int N)
 	  / pow (((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) + 1)), 2);
       if (std::isnan (f0_given[i]))
 	f0_given[i] = 1.;
+
+
       f0_given[N - i - 1] = f0_given[i];
     }
+
+
 }
 
 void
@@ -710,6 +713,7 @@ Step26::HeatEquation<2> heat_equation_solver;
 void
 SCFT_wrapper (int N, double * in, double * out)
 {
+
   N = N + 2;
 //  for (int i = 1; i < N - 1; i++)
 //    printf ("in[%d]=%2.15f \n", i, in[i]);
@@ -740,7 +744,7 @@ main ()
     {
       using namespace dealii;
       using namespace Step26;
-      int N = 33;
+      int N = 163;
       int de;
       double* yita_1D = (double*) malloc (N * sizeof(double)); // this is the yita for 1D, length=N;
       double* yita_2D = (double*) malloc (N * sizeof(double) * 2); // need to convert it to 2D because mat is 2N by 2N;
@@ -754,10 +758,12 @@ main ()
 
       get_f0_given (tau, L, N);
 
+
 //      printf ("f0_given\n");
 //      for (int i = 0; i < N; i++)
 //	printf ("%f \n", f0_given[i]);
 //      printf ("\n");
+
 
       // read data from file:
       FILE *file;
