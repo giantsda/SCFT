@@ -364,6 +364,7 @@ void HeatEquation<dim>::refine_mesh() {
 	new_solution.print(std::cout);
 	scanf("%d", &de);
 
+
 	refine_times++;
 
 }
@@ -499,16 +500,11 @@ HeatEquation<dim>::run() {
 	std::cout << "Number of active cells: " << triangulation.n_active_cells()
 			<< std::endl;
 
-	for (int i = 0; i < N; i++)
-		printf("yita_middle_1D[%d]=%0.15f \n", i, yita_middle_1D[i]);
-//	scanf("%d", &de);
-
 	// convert yita_middle_1D to yita_full_2D;
 	for (int i = 1; i < N - 1; i++)
 		yita_full_1D[i] = yita_middle_1D[i];
 	yita_full_1D[0] = 0.;
 	yita_full_1D[N - 1] = 0.;
-
 	for (int i = 2; i < N; i++) {
 		yita_full_2D[2 * i] = yita_full_1D[i];
 		yita_full_2D[2 * i + 1] = yita_full_1D[i];
