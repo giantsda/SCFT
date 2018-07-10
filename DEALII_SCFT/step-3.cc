@@ -387,7 +387,18 @@ namespace Step26
 	    cell->set_refine_flag (RefinementCase<dim>::cut_axis (0));
 	}
 
+      SolutionTransfer<dim> solution_trans (dof_handler);
+      Vector<double> previous_solution, new_solution;
+      previous_solution = solution;
+      triangulation.prepare_coarsening_and_refinement ();
+      solution_trans.prepare_for_coarsening_and_refinement (previous_solution);
       triangulation.execute_coarsening_and_refinement ();
+      setup_system ();
+      new_solution.reinit (dof_handler.n_dofs ());
+      solution_trans.interpolate (previous_solution, new_solution);
+      int de;
+      new_solution.print (std::cout);
+      //	scanf("%d", &de);
       refine_times++;
 
     }
@@ -444,7 +455,7 @@ namespace Step26
 	    }
 	}
 
-      int ii;
+      int ii = 0;
       for (auto itr = solution_table_tmp.begin ();
 	  itr != solution_table_tmp.end (); ++itr)
 	{
