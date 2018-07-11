@@ -20,6 +20,6 @@ run:
 	 
 
 clean :
-	rm *.o step-3 *.vtk solution_store.txt
+	rm *.o step-3 *.vtk solution_store.txt solution_yita_1D*.txt
 
  

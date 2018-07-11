@@ -59,6 +59,8 @@ jc; /* For re-use of Jacobian. jc denotes the status of Jacobian calculation: 0 
  1 for previously calculated, 2 for currently calculated */
 int PRINT, local_iteration = 0;
 
+int de; // My debug varaibel
+
 double **
 Matcreate (int r, int c)
 {
@@ -123,6 +125,8 @@ namespace Step26
       build_solution_table ();
       void
       output_results_for_yita_full_2D_t () const;
+      void
+      print_and_save_yita_1D ();
 
       Triangulation<dim> triangulation;
       FE_Q<dim> fe;
@@ -358,8 +362,10 @@ namespace Step26
     HeatEquation<dim>::refine_mesh ()
     {
 
-      output_results_for_yita_full_2D_t ();
+//      output_results_for_yita_full_2D_t ();
+      print_and_save_yita_1D ();
 
+      scanf ("%d", &de);
 #undef float
       Vector<float> estimated_error_per_cell (triangulation.n_active_cells ());
       Vector<double> yita_full_2D_t (N * 2);
@@ -399,7 +405,7 @@ namespace Step26
       setup_system ();
       new_solution.reinit (dof_handler.n_dofs ());
       solution_trans.interpolate (previous_solution, new_solution);
-      int de;
+
       new_solution.print (std::cout);
       //	scanf("%d", &de);
       refine_times++;
@@ -413,7 +419,6 @@ namespace Step26
       printf ("The solution_store is %x\n", solution_store);
       printf ("The solution_store[2][0] is %x\n", &solution_store[2][0]);
 
-      int de;
 //      scanf ("%d", &de);
     }
 
@@ -434,11 +439,11 @@ namespace Step26
       data_out.write_vtk (output);
       printf ("%s is written \n", filename.c_str ());
     }
+
   template<int dim>
     void
     HeatEquation<dim>::build_solution_table ()
     {
-      int de;
 
       Point<2, double> P;
       std::vector<types::global_dof_index> loc_dof_indices (fe.dofs_per_cell);
@@ -452,7 +457,7 @@ namespace Step26
 	      P = cell->vertex (i);
 	      if (P (1) == 0)
 		{
-		  std::cout << P (0) << "=" << loc_dof_indices[i] << std::endl;
+//		  std::cout << P (0) << "=" << loc_dof_indices[i] << std::endl;
 		  solution_table_x_to_2D.insert (
 		      std::pair<double, int> (P (0), loc_dof_indices[i]));
 		}
@@ -567,6 +572,38 @@ namespace Step26
 
   template<int dim>
     void
+    HeatEquation<dim>::print_and_save_yita_1D ()
+    {
+
+      printf ("Solved ! \n middle_solution: N=%d \n", get_N ());
+
+      // print and write  solution;
+
+      FILE * fp;
+      char filename[64], num[64];
+      sprintf (num, "%d", get_N ());
+
+      strcpy (filename, "solution_yita_1D_N= ");
+      strcat (filename, num);
+      strcat (filename, ".txt");
+
+      fp = fopen (filename, "w+");
+      fprintf (fp, "N= %d \n", get_N ());
+      for (int i = 0; i < N; i++)
+	{
+	  printf ("solution[%d]=%2.15f \n", i, yita_full_1D[i]);
+	  fprintf (fp, "%d, %2.15f\n", i, yita_full_1D[i]);
+	}
+
+      fclose (fp);
+
+      printf ("%s is written. \n", filename);
+//      scanf ("%d", &de);
+
+    }
+
+  template<int dim>
+    void
     HeatEquation<dim>::update_internal_data ()
     {
       time = 0.;
@@ -598,7 +635,7 @@ namespace Step26
     double *
     HeatEquation<dim>::run ()
     {
-      int de;
+
       if (refine_times == 0)
 	{
 	  std::vector<unsigned int> repetitions;
@@ -765,7 +802,6 @@ namespace Step26
     HeatEquation<dim>::run_experiemnt ()
     {
 
-      int de;
       if (refine_times == 0)
 	{
 	  std::vector<unsigned int> repetitions;
@@ -864,15 +900,6 @@ get_f0_given (double tau, double L, int N, std::vector<double> & x)
 }
 
 void
-print_solution (double* x_nr, int N)
-{
-  printf ("middle_solution: \n");
-  for (int i = 1; i < N - 1; i++)
-    printf ("solution[%d]=%2.15f \n", i, x_nr[i]);
-
-}
-
-void
 myfun (int n, double * x, double * xnew)
 {
   xnew[1] = x[1] * 0.5 - 2.;
@@ -902,7 +929,6 @@ SCFT_wrapper (int N, double * in, double * out)
   fflush (stdout);
   local_iteration++;
 
-//  int de;
 //  if (heat_equation_solver.get_refine_times () == 2)
 //    scanf ("%d", &de);
 
@@ -916,44 +942,39 @@ main ()
       using namespace dealii;
       using namespace Step26;
       int N = 33;
-      int de;
-      double* yita_1D = (double*) malloc (N * sizeof(double)); // this is the yita for 1D, length=N;
-      double* yita_2D = (double*) malloc (N * sizeof(double) * 2); // need to convert it to 2D because mat is 2N by 2N;
+
       double* yita_middle = (double*) malloc ((N - 1) * sizeof(double) * 2); // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
       f0_given = (double*) malloc (N * sizeof(double)); // this is the ideal f0;
       double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
       std::vector<double> x;
-      for (int i = 0; i < N; i++)
-	yita_1D[i] = i;
-      // Convert yita_given to yita, because we are at a 2D problem, every node needs a associate yita value.
-
-//      printf ("f0_given\n");
-//      for (int i = 0; i < N; i++)
-//	printf ("%f \n", f0_given[i]);
-//      printf ("\n");
 
       // read data from file:
-      FILE *file;
-      file = fopen ("Exp_m32_n2048_IE.res", "r");
-      if (file == NULL)
 	{
-	  fprintf (stderr, "Can't open input file in.list!\n");
-	  return 1;
+	  FILE *file;
+	  file = fopen ("N=33_for_read.txt", "r");
+	  if (file == NULL)
+	    {
+	      fprintf (stderr, "Can't open input file in.list!\n");
+	      return 1;
+	    }
+	  char buff[255];
+	  int line = 1;
+	  int i;
+	  double value;
+
+	  fgets (buff, 255, (FILE*) file);
+	  sscanf (buff, "N= %d", &N);
+	  while (fgets (buff, 255, (FILE*) file))
+	    {
+	      sscanf (buff, "%d , %lf", &i, &value);
+	      yita_middle[i] = value;
+	    }
+	  fclose (file);
 	}
-      char buff[255];
-      int line = 1;
-      double c, e;
-      for (int i = 0; i < 10; i++)
-	fgets (buff, 255, (FILE*) file);
-      while (fgets (buff, 255, (FILE*) file))
-	{
-	  sscanf (buff, "%lf %lf %lf %lf %lf", &c, &c, &e, &c, &c);
-	  yita_middle[line] = e;
-	  line++;
-	  if (line == N - 1)
-	    break;
-	}
-      fclose (file);
+
+//      for (int i = 0; i < N; i++)
+//	printf ("yita_middle[%d]=%2.15f \n", i, yita_middle[i]);
+//      scanf ("%d", &de);
 
       int check = 1;
       qt = dmatrix (1, N - 2, 1, N - 2);
@@ -965,7 +986,8 @@ main ()
       for (int i = 1; i < N - 1; i++)
 	x_nr[i] = yita_middle[i];
 //	x_nr[i] = 0.;
-      for (int i = 0; i < N - 1; i++)
+
+      for (int i = 1; i < N - 1; i++)
 	printf ("x_nr[%d]=%f \n", i, x_nr[i]);
 
       Step26::HeatEquation<2> other (N, 2048, L, x_nr); // This tells the yita_middle_1D and x_nr has the same address;
@@ -973,7 +995,8 @@ main ()
       heat_equation_solver = other;
       /*The assignment constructor transfer the address of x_nr
        to heat_equation_solver.yita_middle_1D*/
-//      other.~HeatEquation ();
+
+      // calculate f0_given
       x.resize (N);
       for (int i = 0; i < N; i++)
 	{
@@ -981,6 +1004,12 @@ main ()
 	}
       get_f0_given (tau, L, N, x);
 
+      //      printf ("f0_given\n");
+      //      for (int i = 0; i < N; i++)
+      //	printf ("%f \n", f0_given[i]);
+      //      printf ("\n");
+
+      /*--------------------------------------------------------------*/
 //      for (int u = 0; u < 500; u++)
 //	{
 //	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
@@ -1004,7 +1033,6 @@ main ()
 //	}
 
       broydn (x_nr, N - 2, &check, SCFT_wrapper);
-      print_solution (x_nr, N);
       heat_equation_solver.refine_mesh ();
       heat_equation_solver.update_internal_data ();
       free_dvector (x_nr, 1, N - 2);
@@ -1019,14 +1047,15 @@ main ()
       get_f0_given (tau, L, N, x);
       local_iteration = 0;
       broydn (x_nr, N - 2, &check, SCFT_wrapper);
+      heat_equation_solver.refine_mesh ();
 
 //      heat_equation_solver.run_experiemnt ();
 
 //      double haha[N];
 //      SCFT_wrapper (N - 2, x_nr, haha);
 
-      free (yita_2D);
-      free (yita_1D);
+      free (yita_middle);
+
     }
   catch (std::exception &exc)
     {
