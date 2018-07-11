@@ -338,6 +338,7 @@ namespace Step26
       solution.reinit (dof_handler.n_dofs ());
       old_solution.reinit (dof_handler.n_dofs ());
       system_rhs.reinit (dof_handler.n_dofs ());
+      N = triangulation.n_active_cells () + 1;
 
     }
 
@@ -437,6 +438,8 @@ namespace Step26
     void
     HeatEquation<dim>::build_solution_table ()
     {
+      int de;
+
       Point<2, double> P;
       std::vector<types::global_dof_index> loc_dof_indices (fe.dofs_per_cell);
       typename DoFHandler<2>::active_cell_iterator cell =
@@ -449,13 +452,12 @@ namespace Step26
 	      P = cell->vertex (i);
 	      if (P (1) == 0)
 		{
-//		  std::cout << P (0) << "=" << loc_dof_indices[i] << std::endl;
+		  std::cout << P (0) << "=" << loc_dof_indices[i] << std::endl;
 		  solution_table_x_to_2D.insert (
 		      std::pair<double, int> (P (0), loc_dof_indices[i]));
 		}
 	    }
 	}
-
       int ii = 0;
       for (auto itr = solution_table_x_to_2D.begin ();
 	  itr != solution_table_x_to_2D.end (); ++itr)
@@ -491,17 +493,12 @@ namespace Step26
 	      std::pair<int, int> (i, solution_table_x_to_1D.find (x)->second));
 	}
 
+//      printf("print Table: \n");
+
+//      printf ("N=%d \n", get_N ());
 //      printf ("solution_table_x_to_2D\n");
 //      for (auto itr = solution_table_x_to_2D.begin ();
 //	  itr != solution_table_x_to_2D.end (); ++itr)
-//	{
-//	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
-//	}
-//      std::cout << std::endl;
-//
-//      printf ("solution_table_1D_to_2D\n");
-//      for (auto itr = solution_table_1D_to_2D.begin ();
-//	  itr != solution_table_1D_to_2D.end (); ++itr)
 //	{
 //	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
 //	}
@@ -515,6 +512,14 @@ namespace Step26
 //	}
 //      std::cout << std::endl;
 //
+//      printf ("solution_table_1D_to_2D\n");
+//      for (auto itr = solution_table_1D_to_2D.begin ();
+//	  itr != solution_table_1D_to_2D.end (); ++itr)
+//	{
+//	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
+//	}
+//      std::cout << std::endl;
+//
 //      printf ("solution_table_2D_to_1D\n");
 //      for (auto itr = solution_table_2D_to_1D.begin ();
 //	  itr != solution_table_2D_to_1D.end (); ++itr)
@@ -522,23 +527,17 @@ namespace Step26
 //	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
 //	}
 //      std::cout << std::endl;
-
+//
 //      for (cell = dof_handler.begin_active (); cell != endc; cell++)
 //	{
 //	  cell->get_dof_indices (loc_dof_indices);
 //	  for (int i = 0; i < fe.dofs_per_cell; i++)
 //	    {
 //	      P = cell->vertex (i);
-////	      if (P (1) == 0)
-////		{
 //	      std::cout << P << "->" << loc_dof_indices[i] << std::endl;
-////		  solution_table_x_to_2D.insert (
-////		      std::pair<double, int> (P (0), loc_dof_indices[i]));
-////		}
 //	    }
 //	}
-
-//      int de;
+//
 //      scanf ("%d", &de);
 
     }
@@ -572,10 +571,7 @@ namespace Step26
     {
       time = 0.;
       timestep_number = 0;
-//      setup_system ();
-      N = triangulation.n_active_cells () + 1;
-//      int N2 = dof_handler.n_dofs () / 2;
-
+//      N = triangulation.n_active_cells () + 1;
       printf ("N=%d  \n", N);
       Matfree (solution_store);
       solution_store = Matcreate (N + 1, total_time_step + 1);
@@ -593,6 +589,9 @@ namespace Step26
       jc = 0;
       err = 0.00000001;
       solution_table_1D_to_2D.clear ();
+      solution_table_2D_to_1D.clear ();
+      solution_table_x_to_2D.clear ();
+      solution_table_2D_to_x.clear ();
     }
 
   template<int dim>
@@ -770,30 +769,31 @@ namespace Step26
       if (refine_times == 0)
 	{
 	  std::vector<unsigned int> repetitions;
-	  repetitions.push_back (N - 1);
+	  repetitions.push_back (5);
 	  repetitions.push_back (1);
 	  GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,
 						     Point<2> (0.0, 0.0),
-						     Point<2> (L, L / N), true);
+						     Point<2> (1, 1), true);
 	  refine_times++;
 	}
       std::cout << "Number of active cells: " << triangulation.n_active_cells ()
 	  << std::endl;
 
-      //      std::ofstream out ("grid-1.vtk");
-      //      GridOut grid_out;
-      //      grid_out.write_vtk (triangulation, out);
-      //      std::cout << "Grid written to grid-1.vtk" << std::endl;
+      std::ofstream out ("grid-1.vtk");
+      GridOut grid_out;
+      grid_out.write_vtk (triangulation, out);
+      std::cout << "Grid written to grid-1.vtk" << std::endl;
 
       setup_system ();
 
-      VectorTools::interpolate (dof_handler, Initial_condition<dim> (),
-				old_solution);
-      solution = old_solution;
-//      output_results ();
+      for (int i = 0; i < solution.size (); i++)
+	solution[i] = i;
 
-      if (local_iteration == 0)
-	build_solution_table ();
+      output_results ();
+
+      build_solution_table ();
+
+//      scanf ("%d", &de);
 
       // convert yita_middle_1D to yita_full_2D;
       for (int i = 1; i < N - 1; i++)
@@ -807,6 +807,30 @@ namespace Step26
 	  yita_full_2D[i] = yita_full_1D[j];
 //	  printf ("%d -> %d\n", i, j);
 	}
+
+      typename DoFHandler<dim>::active_cell_iterator cell =
+	  dof_handler.begin_active (), endc = dof_handler.end ();
+	{
+	  int i = 0;
+	  for (cell = dof_handler.begin_active (); cell != endc; ++cell)
+	    {
+	      if (i == 0 || i == 4)
+		cell->set_refine_flag (RefinementCase<dim>::cut_axis (0));
+	      i++;
+	    }
+	}
+
+//      triangulation.prepare_coarsening_and_refinement ();
+      triangulation.execute_coarsening_and_refinement ();
+      setup_system ();
+      for (int i = 0; i < solution.size (); i++)
+	solution[i] = i;
+      update_internal_data ();
+      timestep_number = 1;
+
+      printf ("-------------------------------------------------\n");
+      build_solution_table ();
+      output_results ();
 
       double *a;
       return a;
@@ -979,24 +1003,24 @@ main ()
 //	  local_iteration = 0;
 //	}
 
-//      broydn (x_nr, N - 2, &check, SCFT_wrapper);
-//      print_solution (x_nr, N);
-//      heat_equation_solver.refine_mesh ();
-//      heat_equation_solver.update_internal_data ();
-//      free_dvector (x_nr, 1, N - 2);
-//      N = heat_equation_solver.get_N ();
-//      x_nr = dvector (1, N - 2);
-//      for (int i = 1; i < N - 1; i++)
-//	x_nr[i] = 0.;
-//      heat_equation_solver.set_yita_middle_1D (x_nr);
-//      f0_given = (double*) realloc (f0_given, N * sizeof(double));
-//      x.resize (heat_equation_solver.get_N ());
-//      heat_equation_solver.get_x (x);
-//      get_f0_given (tau, L, N, x);
-//      local_iteration = 0;
-//      broydn (x_nr, N - 2, &check, SCFT_wrapper);
+      broydn (x_nr, N - 2, &check, SCFT_wrapper);
+      print_solution (x_nr, N);
+      heat_equation_solver.refine_mesh ();
+      heat_equation_solver.update_internal_data ();
+      free_dvector (x_nr, 1, N - 2);
+      N = heat_equation_solver.get_N ();
+      x_nr = dvector (1, N - 2);
+      for (int i = 1; i < N - 1; i++)
+	x_nr[i] = 0.;
+      heat_equation_solver.set_yita_middle_1D (x_nr);
+      f0_given = (double*) realloc (f0_given, N * sizeof(double));
+      x.resize (heat_equation_solver.get_N ());
+      heat_equation_solver.get_x (x);
+      get_f0_given (tau, L, N, x);
+      local_iteration = 0;
+      broydn (x_nr, N - 2, &check, SCFT_wrapper);
 
-      heat_equation_solver.run_experiemnt ();
+//      heat_equation_solver.run_experiemnt ();
 
 //      double haha[N];
 //      SCFT_wrapper (N - 2, x_nr, haha);
