@@ -96,7 +96,7 @@ namespace Step26
       ~HeatEquation () = default;
       int
       get_refine_times ();
-      std::vector<double> &
+      void
       get_x (std::vector<double> & in);
       void
       set_refine_times (int a);
@@ -152,7 +152,10 @@ namespace Step26
       double* yita_full_2D;
       double* out;
       int refine_times;
-      std::map<int, int> solution_table;
+      std::map<int, int> solution_table_1D_to_2D;
+      std::map<int, int> solution_table_2D_to_1D;
+      std::map<double, int> solution_table_x_to_2D;
+      std::map<int, double> solution_table_2D_to_x;
     };
 
   template<int dim>
@@ -237,7 +240,7 @@ namespace Step26
     }
 
   template<int dim>
-    std::vector<double> &
+    void
     HeatEquation<dim>::get_x (std::vector<double> & in)
     {
       typename Triangulation<dim>::active_vertex_iterator vertex =
@@ -255,7 +258,6 @@ namespace Step26
 	    }
 	}
       std::sort (in.begin (), in.end ());
-      return in;
     }
 
   template<int dim>
@@ -435,8 +437,7 @@ namespace Step26
     void
     HeatEquation<dim>::build_solution_table ()
     {
-      std::map<double, int> solution_table_tmp;
-      Point<2> P;
+      Point<2, double> P;
       std::vector<types::global_dof_index> loc_dof_indices (fe.dofs_per_cell);
       typename DoFHandler<2>::active_cell_iterator cell =
 	  dof_handler.begin_active (), endc = dof_handler.end ();
@@ -449,34 +450,94 @@ namespace Step26
 	      if (P (1) == 0)
 		{
 //		  std::cout << P (0) << "=" << loc_dof_indices[i] << std::endl;
-		  solution_table_tmp.insert (
+		  solution_table_x_to_2D.insert (
 		      std::pair<double, int> (P (0), loc_dof_indices[i]));
 		}
 	    }
 	}
 
       int ii = 0;
-      for (auto itr = solution_table_tmp.begin ();
-	  itr != solution_table_tmp.end (); ++itr)
+      for (auto itr = solution_table_x_to_2D.begin ();
+	  itr != solution_table_x_to_2D.end (); ++itr)
 	{
-	  solution_table.insert (std::pair<int, int> (ii, itr->second));
+	  solution_table_1D_to_2D.insert (
+	      std::pair<int, int> (ii, itr->second));
 	  ii++;
 	}
+// Now build table_x_to_1D
 
-//      for (auto itr = solution_table_tmp.begin ();
-//	  itr != solution_table_tmp.end (); ++itr)
+      std::map<double, int> solution_table_x_to_1D;
+      std::vector<double> x;
+      x.resize (get_N ());
+      get_x (x);
+      for (int i = 0; i < x.size (); i++)
+	solution_table_x_to_1D.insert (std::pair<double, int> (x[i], i));
+
+      for (cell = dof_handler.begin_active (); cell != endc; cell++)
+	{
+	  cell->get_dof_indices (loc_dof_indices);
+	  for (int i = 0; i < fe.dofs_per_cell; i++)
+	    {
+	      P = cell->vertex (i);
+	      solution_table_2D_to_x.insert (
+		  std::pair<int, double> (loc_dof_indices[i], P (0)));
+	    }
+	}
+
+      for (int i = 0; i < 2 * N; i++)
+	{
+	  double x = solution_table_2D_to_x.find (i)->second;
+	  solution_table_2D_to_1D.insert (
+	      std::pair<int, int> (i, solution_table_x_to_1D.find (x)->second));
+	}
+
+//      printf ("solution_table_x_to_2D\n");
+//      for (auto itr = solution_table_x_to_2D.begin ();
+//	  itr != solution_table_x_to_2D.end (); ++itr)
 //	{
-//	  std::cout << '\t' << itr->first << '\t' << itr->second << '\n';
+//	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
 //	}
 //      std::cout << std::endl;
 //
-//      for (auto itr = solution_table.begin (); itr != solution_table.end ();
-//	  ++itr)
+//      printf ("solution_table_1D_to_2D\n");
+//      for (auto itr = solution_table_1D_to_2D.begin ();
+//	  itr != solution_table_1D_to_2D.end (); ++itr)
 //	{
-//	  std::cout << '\t' << itr->first << '\t' << itr->second << '\n';
+//	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
 //	}
 //      std::cout << std::endl;
 //
+//      printf ("solution_table_2D_to_x\n");
+//      for (auto itr = solution_table_2D_to_x.begin ();
+//	  itr != solution_table_2D_to_x.end (); ++itr)
+//	{
+//	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
+//	}
+//      std::cout << std::endl;
+//
+//      printf ("solution_table_2D_to_1D\n");
+//      for (auto itr = solution_table_2D_to_1D.begin ();
+//	  itr != solution_table_2D_to_1D.end (); ++itr)
+//	{
+//	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
+//	}
+//      std::cout << std::endl;
+
+//      for (cell = dof_handler.begin_active (); cell != endc; cell++)
+//	{
+//	  cell->get_dof_indices (loc_dof_indices);
+//	  for (int i = 0; i < fe.dofs_per_cell; i++)
+//	    {
+//	      P = cell->vertex (i);
+////	      if (P (1) == 0)
+////		{
+//	      std::cout << P << "->" << loc_dof_indices[i] << std::endl;
+////		  solution_table_x_to_2D.insert (
+////		      std::pair<double, int> (P (0), loc_dof_indices[i]));
+////		}
+//	    }
+//	}
+
 //      int de;
 //      scanf ("%d", &de);
 
@@ -531,7 +592,7 @@ namespace Step26
       d = dvector (1, N - 2);
       jc = 0;
       err = 0.00000001;
-      solution_table.clear ();
+      solution_table_1D_to_2D.clear ();
     }
 
   template<int dim>
@@ -552,21 +613,6 @@ namespace Step26
       std::cout << "Number of active cells: " << triangulation.n_active_cells ()
 	  << std::endl;
 
-      // convert yita_middle_1D to yita_full_2D;
-      for (int i = 1; i < N - 1; i++)
-	yita_full_1D[i] = yita_middle_1D[i];
-      yita_full_1D[0] = 0.;
-      yita_full_1D[N - 1] = 0.;
-      for (int i = 2; i < N; i++)
-	{
-	  yita_full_2D[2 * i] = yita_full_1D[i];
-	  yita_full_2D[2 * i + 1] = yita_full_1D[i];
-	}
-      yita_full_2D[0] = yita_full_1D[0];
-      yita_full_2D[2] = yita_full_1D[0];
-      yita_full_2D[1] = yita_full_1D[1];
-      yita_full_2D[3] = yita_full_1D[1];
-
       //      std::ofstream out ("grid-1.vtk");
       //      GridOut grid_out;
       //      grid_out.write_vtk (triangulation, out);
@@ -582,8 +628,22 @@ namespace Step26
       if (local_iteration == 0)
 	build_solution_table ();
 
-//      scanf ("%d", &de);
-      int period = 1;
+      // convert yita_middle_1D to yita_full_2D;
+      for (int i = 1; i < N - 1; i++)
+	yita_full_1D[i] = yita_middle_1D[i];
+      yita_full_1D[0] = 0.;
+      yita_full_1D[N - 1] = 0.;
+
+      for (int i = 0; i < 2 * N; i++)
+	{
+	  int j = solution_table_2D_to_1D.find (i)->second;
+	  yita_full_2D[i] = yita_full_1D[j];
+//	  printf ("%d -> %d\n", i, j);
+	}
+
+//      for (int i = 0; i < 2 * N; i++)
+//	printf ("yita_full_2D[%d]=%2.15f\n", i, yita_full_2D[i]);
+
       for (timestep_number = 1; timestep_number < total_time_step;
 	  timestep_number++)
 	{
@@ -638,8 +698,8 @@ namespace Step26
 
 //	  if (refine_times == 2)
 //	    {
-//	      output_results ();
-//	      scanf ("%d", &de);
+//	  output_results ();
+//	  scanf ("%d", &de);
 //	    }
 
 //	  for (auto itr = solution_table.begin (); itr != solution_table.end ();
@@ -656,7 +716,7 @@ namespace Step26
 	  for (int i = 0; i < N; i++)
 	    {
 	      solution_store[i + 1][timestep_number] =
-		  solution[solution_table.find (i)->second];
+		  solution[solution_table_1D_to_2D.find (i)->second];
 	    }
 	}
 
@@ -705,7 +765,50 @@ namespace Step26
     double *
     HeatEquation<dim>::run_experiemnt ()
     {
-      double* a;
+
+      int de;
+      if (refine_times == 0)
+	{
+	  std::vector<unsigned int> repetitions;
+	  repetitions.push_back (N - 1);
+	  repetitions.push_back (1);
+	  GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,
+						     Point<2> (0.0, 0.0),
+						     Point<2> (L, L / N), true);
+	  refine_times++;
+	}
+      std::cout << "Number of active cells: " << triangulation.n_active_cells ()
+	  << std::endl;
+
+      //      std::ofstream out ("grid-1.vtk");
+      //      GridOut grid_out;
+      //      grid_out.write_vtk (triangulation, out);
+      //      std::cout << "Grid written to grid-1.vtk" << std::endl;
+
+      setup_system ();
+
+      VectorTools::interpolate (dof_handler, Initial_condition<dim> (),
+				old_solution);
+      solution = old_solution;
+//      output_results ();
+
+      if (local_iteration == 0)
+	build_solution_table ();
+
+      // convert yita_middle_1D to yita_full_2D;
+      for (int i = 1; i < N - 1; i++)
+	yita_full_1D[i] = yita_middle_1D[i];
+      yita_full_1D[0] = 0.;
+      yita_full_1D[N - 1] = 0.;
+
+      for (int i = 0; i < 2 * N; i++)
+	{
+	  int j = solution_table_2D_to_1D.find (i)->second;
+	  yita_full_2D[i] = yita_full_1D[j];
+//	  printf ("%d -> %d\n", i, j);
+	}
+
+      double *a;
       return a;
     }
 
@@ -759,9 +862,9 @@ SCFT_wrapper (int N, double * in, double * out)
 {
 
   N = N + 2;
-  for (int i = 1; i < N - 1; i++)
-    printf ("in[%d]=%2.15f \n", i, in[i]);
-  printf ("CONTINUE>>>>>>>>>>>>>>>\n");
+//  for (int i = 1; i < N - 1; i++)
+//    printf ("in[%d]=%2.15f \n", i, in[i]);
+//  printf ("CONTINUE>>>>>>>>>>>>>>>\n");
   double* res = heat_equation_solver.run ();
 
   for (int i = 1; i < N - 1; i++)
@@ -876,22 +979,24 @@ main ()
 //	  local_iteration = 0;
 //	}
 
-      broydn (x_nr, N - 2, &check, SCFT_wrapper);
-      print_solution (x_nr, N);
-      heat_equation_solver.refine_mesh ();
-      heat_equation_solver.update_internal_data ();
-      free_dvector (x_nr, 1, N - 2);
-      N = heat_equation_solver.get_N ();
-      x_nr = dvector (1, N - 2);
-      for (int i = 1; i < N - 1; i++)
-	x_nr[i] = 0.;
-      heat_equation_solver.set_yita_middle_1D (x_nr);
-      f0_given = (double*) realloc (f0_given, N * sizeof(double));
-      x.resize (heat_equation_solver.get_N ());
-      heat_equation_solver.get_x (x);
-      get_f0_given (tau, L, N, x);
-      local_iteration = 0;
-      broydn (x_nr, N - 2, &check, SCFT_wrapper);
+//      broydn (x_nr, N - 2, &check, SCFT_wrapper);
+//      print_solution (x_nr, N);
+//      heat_equation_solver.refine_mesh ();
+//      heat_equation_solver.update_internal_data ();
+//      free_dvector (x_nr, 1, N - 2);
+//      N = heat_equation_solver.get_N ();
+//      x_nr = dvector (1, N - 2);
+//      for (int i = 1; i < N - 1; i++)
+//	x_nr[i] = 0.;
+//      heat_equation_solver.set_yita_middle_1D (x_nr);
+//      f0_given = (double*) realloc (f0_given, N * sizeof(double));
+//      x.resize (heat_equation_solver.get_N ());
+//      heat_equation_solver.get_x (x);
+//      get_f0_given (tau, L, N, x);
+//      local_iteration = 0;
+//      broydn (x_nr, N - 2, &check, SCFT_wrapper);
+
+      heat_equation_solver.run_experiemnt ();
 
 //      double haha[N];
 //      SCFT_wrapper (N - 2, x_nr, haha);
@@ -924,4 +1029,3 @@ main ()
 
   return 0;
 }
-
