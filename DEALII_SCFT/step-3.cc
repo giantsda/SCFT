@@ -653,7 +653,9 @@ namespace Step26
       printf ("Solved ! \n middle_solution: N=%d \n", get_N ());
 
       // print and write  solution;
-
+      std::vector<double> x;
+      x.resize (N);
+      get_x(x);
       FILE * fp;
       char filename[64], num[64];
       sprintf (num, "%d", get_N ());
@@ -667,7 +669,7 @@ namespace Step26
       for (int i = 0; i < N; i++)
 	{
 	  printf ("solution[%d]=%2.15f \n", i, yita_full_1D[i]);
-	  fprintf (fp, "%d, %2.15f\n", i, yita_full_1D[i]);
+	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i], yita_full_1D[i]);
 	}
 
       fclose (fp);
@@ -938,13 +940,13 @@ read_yita_middle_1D (std::vector<double>& yita_middle, char* filename, int& N)
     }
   char buff[255];
   int i;
-  double value;
+  double value, x;
   fgets (buff, 255, (FILE*) file);
   sscanf (buff, "N= %d", &N);
   yita_middle.resize (N);
   while (fgets (buff, 255, (FILE*) file))
     {
-      sscanf (buff, "%d , %lf", &i, &value);
+      sscanf (buff, "%d ,%lf, %lf", &i, &x, &value);
       yita_middle[i] = value;
     }
   fclose (file);
@@ -1006,6 +1008,7 @@ main ()
 
 //      for (int i = 1; i < N - 1; i++)
 //	printf ("x_nr[%d]=%f \n", i, x_nr[i]);
+//      scanf ("%d", &de);
 
       Step26::HeatEquation<2> other (tau, N, 2048, L, x_nr); // This tells the yita_middle_1D and x_nr has the same address;
       heat_equation_solver = other;
@@ -1018,7 +1021,7 @@ main ()
 //      heat_equation_solver.run_experiemnt ();
 //      return 0;
 
-      for (int i = 0; i < 3; i++)
+      for (int i = 0; i < 300; i++)
 	{
 	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
 	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
