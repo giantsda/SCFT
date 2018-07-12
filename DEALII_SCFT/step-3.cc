@@ -46,6 +46,7 @@
 #include <deal.II/numerics/solution_transfer.h>
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/grid/grid_in.h>
+#include <deal.II/grid/grid_out.h>
 
 #include <fstream>
 #include <iostream>
@@ -128,6 +129,9 @@ namespace Step26
       build_solution_table ();
       void
       output_results_for_yita_full_2D_t () const;
+      void
+      output_mesh ();
+
       void
       print_and_save_yita_1D ();
 
@@ -251,32 +255,49 @@ namespace Step26
     void
     HeatEquation<dim>::get_x (std::vector<double> & in)
     {
+// old version, for better performance. make sure, all vertex is loop over once or will get a seg error.
       typename Triangulation<dim>::active_vertex_iterator vertex =
 	  triangulation.begin_active_vertex (), endv =
 	  triangulation.end_vertex ();
-      Point<2> P;
-      std::map<double, int> map;
-      for (vertex = triangulation.begin_active_vertex (); vertex != endv;
-	  vertex++)
+      int i = 0;
+      Point<2> p;
+      for (; vertex != endv; vertex++)
 	{
-	  P = vertex->vertex (1);
-
-	  if (P (1) == 0)
+	  p = vertex->vertex (1);
+	  if (p (1) == 0)
 	    {
-	      map.insert (std::pair<double, int> (P (0), 0));
+	      in[i] = p (0);
+	      i++;
 	    }
 	}
+      std::sort (in.begin (), in.end ());
 
-      if (map.size () != in.size ())
-	{
-	  printf ("map.size () != in.size () in get_x()");
-	  exit (EXIT_FAILURE);
-	}
-      int i = 0;
-      for (auto itr = map.begin (); itr != map.end (); ++itr, i++)
-	{
-	  in[i] = itr->first;
-	}
+//      typename Triangulation<dim>::active_vertex_iterator vertex =
+//	  triangulation.begin_active_vertex (), endv =
+//	  triangulation.end_vertex ();
+//      Point<2> P;
+//      std::map<double, int> map;
+//      for (vertex = triangulation.begin_active_vertex (); vertex != endv;
+//	  vertex++)
+//	{
+//	  P = vertex->vertex (1);
+//
+//	  if (P (1) == 0)
+//	    {
+//	      map.insert (std::pair<double, int> (P (0), 0));
+//	    }
+//	}
+//
+//      if (map.size () != in.size ())
+//	{
+//	  printf ("map.size () != in.size () in get_x()");
+//	  exit (EXIT_FAILURE);
+//	}
+//      int i = 0;
+//      for (auto itr = map.begin (); itr != map.end (); ++itr, i++)
+//	{
+//	  in[i] = itr->first;
+//	}
 
     }
 
@@ -377,10 +398,9 @@ namespace Step26
     void
     HeatEquation<dim>::refine_mesh (std::vector<double> & in)
     {
-
-      output_results_for_yita_full_2D_t ();
       print_and_save_yita_1D ();
-
+      output_results_for_yita_full_2D_t ();
+      output_mesh ();
 //      scanf ("%d", &de);
 
 #undef float
@@ -605,6 +625,24 @@ namespace Step26
 	  + Utilities::int_to_string (get_N (), 3) + ".vtk";
       std::ofstream output (filename.c_str ());
       data_out.write_vtk (output);
+      printf ("%s is written. \n", filename.c_str ());
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::output_mesh ()
+    {
+
+      const std::string filename = "yita_full_2D_N="
+	  + Utilities::int_to_string (get_N (), 3) + ".msh";
+      std::ofstream output (filename.c_str ());
+
+      GridOutFlags::Msh msh_flags (true, true);
+
+      GridOut gridOut;
+      gridOut.set_flags (msh_flags);
+      gridOut.write_msh (triangulation, output);
+      printf ("%s is written. \n", filename.c_str ());
     }
 
   template<int dim>
@@ -700,8 +738,7 @@ namespace Step26
 
       if (refine_times == 0)
 	{
-
-	  if (0)
+	  if (1)
 	    {
 	      std::vector<unsigned int> repetitions;
 	      repetitions.push_back (N - 1);
@@ -716,9 +753,9 @@ namespace Step26
 	    {
 	      GridIn<dim> grid_in;
 	      grid_in.attach_triangulation (triangulation);
-	      std::ifstream input_file ("yita_full_2D_N=043.vtk");
+	      std::ifstream input_file ("yita_full_2D_N=043.msh");
 	      Assert(dim == 2, ExcInternalError());
-	      grid_in.read_vtk (input_file);
+	      grid_in.read_msh (input_file);
 	    }
 
 	  refine_times++;
@@ -753,8 +790,9 @@ namespace Step26
 	  yita_full_2D[i] = yita_full_1D[j];
 	}
 
-      for (int i = 0; i < 2 * N; i++)
-	printf ("yita_full_2D[%d]=%2.15f \n", i, yita_full_2D[i]);
+//      for (int i = 0; i < 2 * N; i++)
+//	printf ("yita_full_2D[%d]=%2.15f \n", i, yita_full_2D[i]);
+//      scanf ("%d", &d);
 
       for (timestep_number = 1; timestep_number < total_time_step;
 	  timestep_number++)
@@ -764,9 +802,9 @@ namespace Step26
 	  system_matrix.add (time_step, laplace_matrix);
 	  tmp.copy_from (mass_matrix);
 
-	  printf ("tmp\n");
-	  tmp.print (std::cout);
-	  scanf ("%d", &d);
+//	  printf ("tmp\n");
+//	  tmp.print (std::cout);
+//	  scanf ("%d", &d);
 
 	  for (unsigned int i = 0; i < tmp.m (); i++)
 	    {
@@ -774,14 +812,14 @@ namespace Step26
 		  tmp.end (i);
 	      for (; begin != end; ++begin)
 		{
-		  printf ("yita_full_2D[%d]=%f \n", i, yita_full_2D[i]);
+//		  printf ("yita_full_2D[%d]=%f \n", i, yita_full_2D[i]);
 		  begin->value () *= yita_full_2D[i];
 		}
 	    }
 
-	  printf ("tmp\n");
-	  tmp.print (std::cout);
-	  scanf ("%d", &d);
+//	  printf ("tmp\n");
+//	  tmp.print (std::cout);
+//	  scanf ("%d", &d);
 
 	  system_matrix.add (time_step, tmp);
 	  mass_matrix.vmult (system_rhs, old_solution);
@@ -799,13 +837,13 @@ namespace Step26
 
 	  solve_time_step ();
 
-	  printf ("system_matrix\n");
-	  system_matrix.print (std::cout);
-	  printf ("system_rhs\n");
-	  system_rhs.print (std::cout);
-	  printf ("solution\n");
-	  solution.print (std::cout);
-	  scanf ("%d", &de);
+//	  printf ("system_matrix\n");
+//	  system_matrix.print (std::cout);
+//	  printf ("system_rhs\n");
+//	  system_rhs.print (std::cout);
+//	  printf ("solution\n");
+//	  solution.print (std::cout);
+//	  scanf ("%d", &de);
 
 	  old_solution = solution;
 	  solution_store[0][timestep_number] = time;
@@ -817,23 +855,25 @@ namespace Step26
 	}
 
 //       write solution;
-	{
-	  FILE * fp;
-	  fp = fopen ("solution_store.txt", "w+");
-	  for (int i = 0; i < N + 1; i++)
-	    {
-	      for (int j = 0; j < total_time_step; j++)
-		fprintf (fp, "%2.15f,", solution_store[i][j]);
-	      fprintf (fp, "\n");
-	    }
+//	{
+//	  FILE * fp;
+//	  fp = fopen ("solution_store.txt", "w+");
+//	  for (int i = 0; i < N + 1; i++)
+//	    {
+//	      for (int j = 0; j < total_time_step; j++)
+//		fprintf (fp, "%2.15f,", solution_store[i][j]);
+//	      fprintf (fp, "\n");
+//	    }
+//
+//	  fclose (fp);
+//	}
 
-	  fclose (fp);
-	}
+//      scanf ("%d", &d);
 
       //   integrate for f0
       //   TODO:change this to better integration method
 
-      printf ("f0: \n");
+//      printf ("f0: \n");
       for (int i = 0; i < N; i++)
 	{
 	  f0[i] = 0.0;
@@ -845,10 +885,10 @@ namespace Step26
 		  * solution_store[i + 1][total_time_step - j - 1 - 1];
 	      f0[i] = f0[i] + 0.5 * time_step * (value_left + value_right);
 	    }
-	  printf ("%0.16f \n", f0[i]);
+//	  printf ("%0.16f \n", f0[i]);
 	}
 
-      scanf ("%d", &de);
+//      scanf ("%d", &de);
       for (int i = 1; i < N - 1; i++)
 	{
 	  out[i] = f0_given[i] - f0[i];
@@ -861,71 +901,24 @@ namespace Step26
     HeatEquation<dim>::run_experiemnt ()
     {
 
-      if (refine_times == 0)
-	{
-	  std::vector<unsigned int> repetitions;
-	  repetitions.push_back (5);
-	  repetitions.push_back (1);
-	  GridGenerator::subdivided_hyper_rectangle (triangulation, repetitions,
-						     Point<2> (0.0, 0.0),
-						     Point<2> (1, 1), true);
-	  refine_times++;
-	}
+      GridIn<dim> grid_in;
+      grid_in.attach_triangulation (triangulation);
+      std::ifstream input_file ("yita_full_2D_N=033.msh");
+      Assert(dim == 2, ExcInternalError());
+      grid_in.read_msh (input_file);
+
+      refine_times++;
+
       std::cout << "Number of active cells: " << triangulation.n_active_cells ()
 	  << std::endl;
 
-      std::ofstream out ("grid-1.vtk");
-      GridOut grid_out;
-      grid_out.write_vtk (triangulation, out);
-      std::cout << "Grid written to grid-1.vtk" << std::endl;
+      f0_given = (double*) realloc (f0_given, N * sizeof(double));
+      std::vector<double> x;
+      x.resize (N);
+      get_x (x);
+      get_f0_given (tau, N, x);
 
       setup_system ();
-
-      for (int i = 0; i < solution.size (); i++)
-	solution[i] = i;
-
-      output_results ();
-
-      build_solution_table ();
-
-//      scanf ("%d", &de);
-
-      // convert yita_middle_1D to yita_full_2D;
-      for (int i = 1; i < N - 1; i++)
-	yita_full_1D[i] = yita_middle_1D[i];
-      yita_full_1D[0] = 0.;
-      yita_full_1D[N - 1] = 0.;
-
-      for (int i = 0; i < 2 * N; i++)
-	{
-	  int j = solution_table_2D_to_1D.find (i)->second;
-	  yita_full_2D[i] = yita_full_1D[j];
-//	  printf ("%d -> %d\n", i, j);
-	}
-
-      typename DoFHandler<dim>::active_cell_iterator cell =
-	  dof_handler.begin_active (), endc = dof_handler.end ();
-	{
-	  int i = 0;
-	  for (cell = dof_handler.begin_active (); cell != endc; ++cell)
-	    {
-	      if (i == 0 || i == 4)
-		cell->set_refine_flag (RefinementCase<dim>::cut_axis (0));
-	      i++;
-	    }
-	}
-
-//      triangulation.prepare_coarsening_and_refinement ();
-      triangulation.execute_coarsening_and_refinement ();
-      setup_system ();
-      for (int i = 0; i < solution.size (); i++)
-	solution[i] = i;
-      update_internal_data ();
-      timestep_number = 1;
-
-      printf ("-------------------------------------------------\n");
-      build_solution_table ();
-      output_results ();
 
       double *a;
       return a;
@@ -996,8 +989,8 @@ main ()
       std::vector<double> yita_middle; // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
       double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
 
-      // read data from file, also set N;
-      read_yita_middle_1D (yita_middle, "solution_yita_1D_N= 43.txt", N);
+      // read data from file, also set N;  N=33_for_read.txt
+      read_yita_middle_1D (yita_middle, "N=33_for_read.txt", N);
       f0_given = (double*) malloc (N * sizeof(double)); // this is the ideal f0;
 
       int check = 1;
@@ -1022,7 +1015,10 @@ main ()
       /*--------------------------------------------------------------*/
       std::vector<double> interpolated_solution_yita_1D;
 
-      for (int i = 0; i < 500; i++)
+//      heat_equation_solver.run_experiemnt ();
+//      return 0;
+
+      for (int i = 0; i < 3; i++)
 	{
 	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
 	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
@@ -1035,6 +1031,7 @@ main ()
 	  f0_given = (double*) realloc (f0_given, N * sizeof(double));
 	  local_iteration = 0;
 	}
+
     }
   catch (std::exception &exc)
     {
