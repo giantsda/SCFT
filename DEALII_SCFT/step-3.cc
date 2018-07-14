@@ -387,7 +387,7 @@ namespace Step26
     void
     HeatEquation<dim>::solve_time_step ()
     {
-      SolverControl solver_control (80000, 1e-13);
+      SolverControl solver_control (80000, 1e-17);
       SolverCG<> solver (solver_control);
       solver.solve (system_matrix, solution, system_rhs,
 		    PreconditionIdentity ());
@@ -655,7 +655,7 @@ namespace Step26
       // print and write  solution;
       std::vector<double> x;
       x.resize (N);
-      get_x(x);
+      get_x (x);
       FILE * fp;
       char filename[64], num[64];
       sprintf (num, "%d", get_N ());
@@ -796,6 +796,10 @@ namespace Step26
 //	printf ("yita_full_2D[%d]=%2.15f \n", i, yita_full_2D[i]);
 //      scanf ("%d", &d);
 
+      for (int i = 2; i < N; i++)
+	solution_store[i][0] = 1.;
+      solution_store[0][0] = 0.;
+      solution_store[N - 1][0] = 0.;
       for (timestep_number = 1; timestep_number < total_time_step;
 	  timestep_number++)
 	{
@@ -1020,6 +1024,8 @@ main ()
 
 //      heat_equation_solver.run_experiemnt ();
 //      return 0;
+
+//      heat_equation_solver.run ();
 
       for (int i = 0; i < 300; i++)
 	{
