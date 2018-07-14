@@ -1,11 +1,9 @@
 function f0=simple_FEM_1D_transient(yita)
 
 N=32+1;
-% yita=ones(N,1)*1;
-% yita=yita*-2000;
+% yita=ones(N,1)*0;
 yita=[0;yita;0];
 % yita=[0;1;2;3;0]
-% yita=yita_answer;
 L=3.72374;
 h=L/(N-1);
 tau=0.5302;
@@ -18,14 +16,21 @@ X=zeros(N,1);
 t=0;
 time_step=2048;
 dt= 1/(time_step-1);
-solution_store=zeros(N+1,time_step);
+solution_store=zeros(N+1,time_step-1);
 
 %% allcate memory
-A=sparse(N,N);
-B=sparse(N,N);
-C=sparse(N,N);
-D=sparse(N,N);
+% A=sparse(N,N);
+% B=sparse(N,N);
+% C=sparse(N,N);
+% D=sparse(N,N);
+% b=zeros(N,1);
+
+A=zeros(N,N);
+B=zeros(N,N);
+C=zeros(N,N);
+D=zeros(N,N);
 b=zeros(N,1);
+
 
 %% A=(f1,f2) come with the modified diffusion term
 for i=2:N-1
@@ -51,12 +56,12 @@ end
 %% It is so important to choose implicit Euler method here,
 %% explicit Euler results in a very small time step.
 D=A+dt*(B+C);
-    %% apply BC
-    D(1,:)=0;
-    D(N,:)=0;
-    D(1,1)=1;
-    D(N,N)=1;
-for T=1:time_step
+%% apply BC
+D(1,:)=0;
+D(N,:)=0;
+D(1,1)=1;
+D(N,N)=1;
+for T=1:time_step-1
     b=A*xold;
     b(1)=0;
     b(N)=0;
@@ -68,25 +73,24 @@ for T=1:time_step
 end
 solution_store=[[0;x_initial] solution_store];
 
-% %% plot solution
+%% plot solution
 % x=linspace(0,L,N);
 % for i=1:time_step
 %     plot(x,solution_store(2:end,i));
 %     title(['T=' num2str(solution_store(1,i))])
 %     ylim([0 1])
-%     pause( 0 )
+%     pause( )
 % end
 
 %% integrate for f0
 
 f0=zeros(N+1,1);
-for j=1:time_step
-    value_left=solution_store(:,j).*solution_store(:,time_step-j+2);
-    value_right=solution_store(:,j+1).*solution_store(:,time_step-(j+1)+2);
+for j=1:time_step-1
+    value_left=solution_store(:,j).*solution_store(:,time_step-j+1);
+    value_right=solution_store(:,j+1).*solution_store(:,time_step-(j+1)+1);
     f0=f0+0.5*(value_left+value_right)*dt;
 end
-f0(1)=[];
-
+f0(1)=[]
 x=linspace(0,L,N);
 plot(x,f0);
 hold on;
