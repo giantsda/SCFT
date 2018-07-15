@@ -145,13 +145,16 @@ namespace Step26
       ConstraintMatrix constraints;
 
       SparsityPattern sparsity_pattern;
-      SparseMatrix<double> mass_matrix;
-      SparseMatrix<double> laplace_matrix;
+      SparseMatrix<double> A; // A: mass matrix (fi[i],fi[j])
+      SparseMatrix<double> B; // B: laplace_matrix (d(fi[i]),d(fi[j]))
       SparseMatrix<double> system_matrix;
-      SparseMatrix<double> tmp;
+      SparseMatrix<double> C; // C: (yita[i]*fi[i],fi[j])
 
-      Vector<double> solution;
-      Vector<double> old_solution;
+      Vector<double> Xnp1;
+      Vector<double> Xn;
+      Vector<double> X_internal_1;
+      Vector<double> X_internal_2;
+      Vector<double> X_internal_3;
       Vector<double> system_rhs;
 
       double tau;
@@ -366,21 +369,19 @@ namespace Step26
 
       sparsity_pattern.copy_from (dsp);
 
-      mass_matrix.reinit (sparsity_pattern);
+      A.reinit (sparsity_pattern);
 
-      laplace_matrix.reinit (sparsity_pattern);
+      B.reinit (sparsity_pattern);
       system_matrix.reinit (sparsity_pattern);
-      tmp.reinit (sparsity_pattern);
+      C.reinit (sparsity_pattern);
 
       MatrixCreator::create_mass_matrix (dof_handler,
-					 QGauss<dim> (fe.degree + 1),
-					 mass_matrix);
+					 QGauss<dim> (fe.degree + 1), A);
       MatrixCreator::create_laplace_matrix (dof_handler,
-					    QGauss<dim> (fe.degree + 1),
-					    laplace_matrix);
+					    QGauss<dim> (fe.degree + 1), B);
 
-      solution.reinit (dof_handler.n_dofs ());
-      old_solution.reinit (dof_handler.n_dofs ());
+      Xnp1.reinit (dof_handler.n_dofs ());
+      Xn.reinit (dof_handler.n_dofs ());
       system_rhs.reinit (dof_handler.n_dofs ());
       N = triangulation.n_active_cells () + 1;
       f0_given = (double*) realloc (f0_given, N * sizeof(double));
@@ -398,8 +399,7 @@ namespace Step26
     {
       SolverControl solver_control (80000, 1e-17);
       SolverCG<> solver (solver_control);
-      solver.solve (system_matrix, solution, system_rhs,
-		    PreconditionIdentity ());
+      solver.solve (system_matrix, Xnp1, system_rhs, PreconditionIdentity ());
 //      std::cout << "     " << solver_control.last_step () << " CG iterations."
 //	  << std::endl;
     }
@@ -481,7 +481,7 @@ namespace Step26
       DataOut<dim> data_out;
 
       data_out.attach_dof_handler (dof_handler);
-      data_out.add_data_vector (solution, "U");
+      data_out.add_data_vector (Xnp1, "U");
 
       data_out.build_patches ();
 
@@ -763,9 +763,8 @@ namespace Step26
       std::cout << "Number of active cells: " << triangulation.n_active_cells ()
 	  << std::endl;
 
-      VectorTools::interpolate (dof_handler, Initial_condition<dim> (),
-				old_solution);
-      solution = old_solution;
+      VectorTools::interpolate (dof_handler, Initial_condition<dim> (), Xn);
+      Xnp1 = Xn;
 
       // convert yita_middle_1D to yita_full_2D;
       for (int i = 1; i < N - 1; i++)
@@ -783,67 +782,50 @@ namespace Step26
 //	printf ("yita_full_2D[%d]=%2.15f \n", i, yita_full_2D[i]);
 //      scanf ("%d", &d);
 
+      system_matrix.copy_from (A);
+      system_matrix.add (time_step, B);
+      C.copy_from (A);
+      for (unsigned int i = 0; i < C.m (); i++)
+	{
+	  SparseMatrix<double>::iterator begin = C.begin (i), end = C.end (i);
+	  for (; begin != end; ++begin)
+	    {
+	      begin->value () *= yita_full_2D[i];
+	    }
+	}
+      system_matrix.add (time_step, C);
+
       for (int i = 2; i < N; i++)
 	solution_store[i][0] = 1.;
       solution_store[0][0] = 0.;
       solution_store[N - 1][0] = 0.;
+
       for (timestep_number = 1; timestep_number < total_time_step;
 	  timestep_number++)
 	{
 	  time += time_step;
-	  system_matrix.copy_from (mass_matrix);
-	  system_matrix.add (time_step, laplace_matrix);
-	  tmp.copy_from (mass_matrix);
 
-//	  printf ("tmp\n");
-//	  tmp.print (std::cout);
-//	  scanf ("%d", &d);
-
-	  for (unsigned int i = 0; i < tmp.m (); i++)
-	    {
-	      SparseMatrix<double>::iterator begin = tmp.begin (i), end =
-		  tmp.end (i);
-	      for (; begin != end; ++begin)
-		{
-//		  printf ("yita_full_2D[%d]=%f \n", i, yita_full_2D[i]);
-		  begin->value () *= yita_full_2D[i];
-		}
-	    }
-
-//	  printf ("tmp\n");
-//	  tmp.print (std::cout);
-//	  scanf ("%d", &d);
-
-	  system_matrix.add (time_step, tmp);
-	  mass_matrix.vmult (system_rhs, old_solution);
+	  A.vmult (system_rhs, Xn);
 	  std::map<types::global_dof_index, double> boundary_values;
 	  VectorTools::interpolate_boundary_values (dof_handler, 0,
 						    ZeroFunction<2> (),
 						    boundary_values);
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
-					      solution, system_rhs);
+					      Xnp1, system_rhs);
 	  VectorTools::interpolate_boundary_values (dof_handler, 1,
 						    ConstantFunction<2> (0.),
 						    boundary_values);
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
-					      solution, system_rhs);
+					      Xnp1, system_rhs);
 
 	  solve_time_step ();
 
-//	  printf ("system_matrix\n");
-//	  system_matrix.print (std::cout);
-//	  printf ("system_rhs\n");
-//	  system_rhs.print (std::cout);
-//	  printf ("solution\n");
-//	  solution.print (std::cout);
-//	  scanf ("%d", &de);
-
-	  old_solution = solution;
+	  Xn = Xnp1;
 	  solution_store[0][timestep_number] = time;
 	  for (int i = 0; i < N; i++)
 	    {
 	      solution_store[i + 1][timestep_number] =
-		  solution[solution_table_1D_to_2D.find (i)->second];
+		  Xnp1[solution_table_1D_to_2D.find (i)->second];
 	    }
 	}
 
@@ -1011,9 +993,12 @@ main ()
 //      heat_equation_solver.run_experiemnt ();
 //      return 0;
 
-//      heat_equation_solver.run ();
+//      double* rere = (double*) malloc (sizeof(double) * 200);
+//      rere = heat_equation_solver.run ();
+//      for (int i = 0; i < N; i++)
+//	printf ("f0_given-f0[%d]=%2.15f \n", i, rere[i]);
 
-      for (int i = 0; i < 300; i++)
+      for (int i = 0; i < 3; i++)
 	{
 	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
 	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
