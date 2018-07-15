@@ -85,6 +85,9 @@ namespace Step26
 {
   using namespace dealii;
 
+  void
+  get_f0_given (double tau, int N, std::vector<double> & x);
+
   template<int dim>
     class HeatEquation
     {
@@ -380,7 +383,13 @@ namespace Step26
       old_solution.reinit (dof_handler.n_dofs ());
       system_rhs.reinit (dof_handler.n_dofs ());
       N = triangulation.n_active_cells () + 1;
-
+      f0_given = (double*) realloc (f0_given, N * sizeof(double));
+      std::vector<double> x;
+      x.resize (N);
+      get_x (x);
+      get_f0_given (tau, N, x);
+      update_internal_data ();
+      build_solution_table ();
     }
 
   template<int dim>
@@ -443,18 +452,6 @@ namespace Step26
       new_solution.reinit (dof_handler.n_dofs ());
       solution_trans.interpolate (previous_solution, new_solution);
 
-//      //
-//      DataOut<dim> data_out;
-//      data_out.attach_dof_handler (dof_handler);
-//      data_out.add_data_vector (new_solution, "U");
-//      data_out.build_patches ();
-//      const std::string filename = "yita_full_2D-002.vtk";
-//      std::ofstream output (filename.c_str ());
-//      data_out.write_vtk (output);
-//      printf ("%s is written \n", filename.c_str ());
-
-      update_internal_data ();
-      build_solution_table ();
       in.resize (get_N ());
       for (unsigned int i = 0; i < in.size (); i++)
 	in[i] = new_solution[solution_table_1D_to_2D.find (i)->second];
@@ -759,26 +756,16 @@ namespace Step26
 	      Assert(dim == 2, ExcInternalError());
 	      grid_in.read_msh (input_file);
 	    }
-
+	  setup_system (); // The first time, the triangulation is generated and system is set up. The
+	  // Next time, it is setup in the refine();
 	  refine_times++;
 	}
       std::cout << "Number of active cells: " << triangulation.n_active_cells ()
 	  << std::endl;
 
-      f0_given = (double*) realloc (f0_given, N * sizeof(double));
-      std::vector<double> x;
-      x.resize (N);
-      get_x (x);
-      get_f0_given (tau, N, x);
-
-      setup_system ();
-
       VectorTools::interpolate (dof_handler, Initial_condition<dim> (),
 				old_solution);
       solution = old_solution;
-
-      if (local_iteration == 0)
-	build_solution_table ();
 
       // convert yita_middle_1D to yita_full_2D;
       for (int i = 1; i < N - 1; i++)
@@ -961,7 +948,6 @@ Step26::HeatEquation<2> heat_equation_solver;
 void
 SCFT_wrapper (int N, double * in, double * out)
 {
-
   N = N + 2;
 //  for (int i = 1; i < N - 1; i++)
 //    printf ("in[%d]=%2.15f \n", i, in[i]);
