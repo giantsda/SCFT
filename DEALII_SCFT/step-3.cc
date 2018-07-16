@@ -772,6 +772,10 @@ namespace Step26
       std::cout << "Number of active cells: " << triangulation.n_active_cells ()
 	  << std::endl;
 
+//      printf ("A:\n");
+//      A.print_formatted (std::cout,8);
+//      scanf ("%d", &de);
+
       VectorTools::interpolate (dof_handler, Initial_condition<dim> (), Xn);
       Xnp1 = Xn; // Comment this line will change solution a little bit, I dont know why.
       X_internal_1 = Xn;
@@ -791,8 +795,6 @@ namespace Step26
 //	printf ("yita_full_2D[%d]=%2.15f \n", i, yita_full_2D[i]);
 //      scanf ("%d", &d);
 
-//      system_matrix.copy_from (A);
-//      system_matrix.add (time_step, B);
       C.copy_from (A);
       for (unsigned int i = 0; i < C.m (); i++)
 	{
@@ -805,40 +807,19 @@ namespace Step26
       E.copy_from (B);
       E.add (1., C);
 
-//      printf ("B:\n");
-//      B.print (std::cout);
-//      printf ("C:\n");
-//      C.print (std::cout);
-//      printf ("E:\n");
-//      E.print (std::cout);
-//      scanf ("%d", &de);
-
-//      system_matrix.add (time_step, C);
-
       for (int i = 2; i < N; i++)
 	solution_store[i][0] = 1.;
       solution_store[0][0] = 0.;
       solution_store[N - 1][0] = 0.;
 
       /*--------------------------------Main time loop------------------------------------------*/
-
       for (timestep_number = 1; timestep_number < total_time_step;
 	  timestep_number++)
 	{
 	  time += time_step;
 	  system_matrix.copy_from (A);
-//	  printf ("system_matrix:\n");
-//	  system_matrix.print (std::cout);
 	  tmp.copy_from (A);
 	  tmp.add (-0.5 * time_step, E);
-
-//	  printf ("E:\n");
-//	  E.print (std::cout);
-//	  printf ("tmp:\n");
-//	  tmp.print (std::cout);
-
-	  printf ("Xn:\n");
-	  Xn.print (std::cout);
 
 	  // Solve X_internal_1
 	  tmp.vmult (system_rhs, Xn);
@@ -854,6 +835,18 @@ namespace Step26
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
 					      X_internal_1, system_rhs);
 	  solve_time_step (X_internal_1);
+
+	  printf ("tmp: \n");
+	  tmp.print_formatted (std::cout, 16);
+	  printf ("E: \n");
+	  E.print_formatted (std::cout, 16);
+	  printf ("system_matrix: \n");
+	  system_matrix.print_formatted (std::cout, 16);
+	  printf ("system_rhs: \n");
+	  system_rhs.print (std::cout, 16);
+	  printf ("X_internal_1");
+	  X_internal_1.print (std::cout, 16);
+	  scanf ("%d", &d);
 	  // Solve X_internal_2
 	  A.vmult (system_rhs, Xn);
 	  E.vmult (tmp_V, X_internal_1);
@@ -870,6 +863,8 @@ namespace Step26
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
 					      X_internal_2, system_rhs);
 	  solve_time_step (X_internal_2);
+	  printf ("X_internal_2");
+	  X_internal_2.print (std::cout, 16);
 	  // Solve X_internal_3
 	  A.vmult (system_rhs, Xn);
 	  E.vmult (tmp_V, X_internal_2);
@@ -886,32 +881,47 @@ namespace Step26
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
 					      X_internal_3, system_rhs);
 	  solve_time_step (X_internal_3);
+	  printf ("X_internal_3");
+	  X_internal_3.print (std::cout, 16);
 	  // Solve Xnp1
 	  tmp.copy_from (A);
-	  tmp.add (-1 / 6 * time_step, E);
+	  tmp.add (-1. / 6 * time_step, E);
 	  tmp.vmult (system_rhs, Xn);
+
 	  E.vmult (tmp_V, X_internal_1);
-	  tmp_V *= 1 / 3 * time_step;
+	  tmp_V *= 1. / 3 * time_step;
 	  system_rhs -= tmp_V;
+
 	  E.vmult (tmp_V, X_internal_2);
-	  tmp_V *= 1 / 3 * time_step;
+	  tmp_V *= 1. / 3 * time_step;
 	  system_rhs -= tmp_V;
+
 	  E.vmult (tmp_V, X_internal_3);
-	  tmp_V *= 1 / 6 * time_step;
+	  tmp_V *= 1. / 6 * time_step;
 	  system_rhs -= tmp_V;
+
 	  VectorTools::interpolate_boundary_values (dof_handler, 0,
 						    ZeroFunction<2> (),
 						    boundary_values);
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
-					      X_internal_3, system_rhs);
+					      Xnp1, system_rhs);
 	  VectorTools::interpolate_boundary_values (dof_handler, 1,
 						    ConstantFunction<2> (0.),
 						    boundary_values);
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
-					      X_internal_3, system_rhs);
+					      Xnp1, system_rhs);
 	  solve_time_step (Xnp1);
 
+	  printf ("system_matrix: \n");
+	  system_matrix.print_formatted (std::cout, 16);
+	  printf ("system_rhs: \n");
+	  system_rhs.print (std::cout, 16);
+	  printf ("Xnp1: \n");
+	  Xnp1.print (std::cout, 16);
+	  scanf ("%d", &d);
+
 	  Xn = Xnp1;
+
 	  solution_store[0][timestep_number] = time;
 	  for (int i = 0; i < N; i++)
 	    {
@@ -927,7 +937,7 @@ namespace Step26
 	  for (int i = 0; i < N + 1; i++)
 	    {
 	      for (int j = 0; j < total_time_step; j++)
-		fprintf (fp, "%2.15f,", solution_store[i][j]);
+		fprintf (fp, "%2.16f,", solution_store[i][j]);
 	      fprintf (fp, "\n");
 	    }
 
@@ -1056,6 +1066,16 @@ main ()
 
       // read data from file, also set N;  N=33_for_read.txt
       read_yita_middle_1D (yita_middle, "N=33_for_read.txt", N);
+
+//      double aaa = 1./9;
+//      printf ("aaa=%5.200f\n", aaa);
+//      printf ("aaa=%5.20f\n", aaa);
+//      printf ("aaa=%5.16f\n", aaa);
+//      scanf ("%d", &de);
+
+      N = 6;
+      yita_middle.resize (N);
+
       f0_given = (double*) malloc (N * sizeof(double)); // this is the ideal f0;
 
       int check = 1;
