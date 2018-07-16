@@ -125,7 +125,7 @@ namespace Step26
       void
       setup_system ();
       void
-      solve_time_step ();
+      solve_time_step (Vector<double> & x);
       void
       output_results () const;
       void
@@ -149,6 +149,8 @@ namespace Step26
       SparseMatrix<double> B; // B: laplace_matrix (d(fi[i]),d(fi[j]))
       SparseMatrix<double> system_matrix;
       SparseMatrix<double> C; // C: (yita[i]*fi[i],fi[j])
+      SparseMatrix<double> E; // E=B+C;
+      SparseMatrix<double> tmp;
 
       Vector<double> Xnp1;
       Vector<double> Xn;
@@ -156,6 +158,7 @@ namespace Step26
       Vector<double> X_internal_2;
       Vector<double> X_internal_3;
       Vector<double> system_rhs;
+      Vector<double> tmp_V;
 
       double tau;
       double time;
@@ -354,6 +357,7 @@ namespace Step26
     void
     HeatEquation<dim>::setup_system ()
     {
+      N = triangulation.n_active_cells () + 1;
       dof_handler.distribute_dofs (fe);
 
       std::cout << std::endl << "==========================================="
@@ -370,10 +374,11 @@ namespace Step26
       sparsity_pattern.copy_from (dsp);
 
       A.reinit (sparsity_pattern);
-
       B.reinit (sparsity_pattern);
-      system_matrix.reinit (sparsity_pattern);
       C.reinit (sparsity_pattern);
+      E.reinit (sparsity_pattern);
+      tmp.reinit (sparsity_pattern);
+      system_matrix.reinit (sparsity_pattern);
 
       MatrixCreator::create_mass_matrix (dof_handler,
 					 QGauss<dim> (fe.degree + 1), A);
@@ -382,8 +387,12 @@ namespace Step26
 
       Xnp1.reinit (dof_handler.n_dofs ());
       Xn.reinit (dof_handler.n_dofs ());
+      X_internal_1.reinit (dof_handler.n_dofs ());
+      X_internal_2.reinit (dof_handler.n_dofs ());
+      X_internal_3.reinit (dof_handler.n_dofs ());
+      tmp_V.reinit (dof_handler.n_dofs ());
       system_rhs.reinit (dof_handler.n_dofs ());
-      N = triangulation.n_active_cells () + 1;
+
       f0_given = (double*) realloc (f0_given, N * sizeof(double));
       std::vector<double> x;
       x.resize (N);
@@ -395,11 +404,11 @@ namespace Step26
 
   template<int dim>
     void
-    HeatEquation<dim>::solve_time_step ()
+    HeatEquation<dim>::solve_time_step (Vector<double> & x)
     {
       SolverControl solver_control (80000, 1e-17);
       SolverCG<> solver (solver_control);
-      solver.solve (system_matrix, Xnp1, system_rhs, PreconditionIdentity ());
+      solver.solve (system_matrix, x, system_rhs, PreconditionIdentity ());
 //      std::cout << "     " << solver_control.last_step () << " CG iterations."
 //	  << std::endl;
     }
@@ -764,8 +773,8 @@ namespace Step26
 	  << std::endl;
 
       VectorTools::interpolate (dof_handler, Initial_condition<dim> (), Xn);
-      Xnp1 = Xn;
-
+      Xnp1 = Xn; // Comment this line will change solution a little bit, I dont know why.
+      X_internal_1 = Xn;
       // convert yita_middle_1D to yita_full_2D;
       for (int i = 1; i < N - 1; i++)
 	yita_full_1D[i] = yita_middle_1D[i];
@@ -782,8 +791,8 @@ namespace Step26
 //	printf ("yita_full_2D[%d]=%2.15f \n", i, yita_full_2D[i]);
 //      scanf ("%d", &d);
 
-      system_matrix.copy_from (A);
-      system_matrix.add (time_step, B);
+//      system_matrix.copy_from (A);
+//      system_matrix.add (time_step, B);
       C.copy_from (A);
       for (unsigned int i = 0; i < C.m (); i++)
 	{
@@ -793,32 +802,114 @@ namespace Step26
 	      begin->value () *= yita_full_2D[i];
 	    }
 	}
-      system_matrix.add (time_step, C);
+      E.copy_from (B);
+      E.add (1., C);
+
+//      printf ("B:\n");
+//      B.print (std::cout);
+//      printf ("C:\n");
+//      C.print (std::cout);
+//      printf ("E:\n");
+//      E.print (std::cout);
+//      scanf ("%d", &de);
+
+//      system_matrix.add (time_step, C);
 
       for (int i = 2; i < N; i++)
 	solution_store[i][0] = 1.;
       solution_store[0][0] = 0.;
       solution_store[N - 1][0] = 0.;
 
+      /*--------------------------------Main time loop------------------------------------------*/
+
       for (timestep_number = 1; timestep_number < total_time_step;
 	  timestep_number++)
 	{
 	  time += time_step;
+	  system_matrix.copy_from (A);
+//	  printf ("system_matrix:\n");
+//	  system_matrix.print (std::cout);
+	  tmp.copy_from (A);
+	  tmp.add (-0.5 * time_step, E);
 
-	  A.vmult (system_rhs, Xn);
+//	  printf ("E:\n");
+//	  E.print (std::cout);
+//	  printf ("tmp:\n");
+//	  tmp.print (std::cout);
+
+	  printf ("Xn:\n");
+	  Xn.print (std::cout);
+
+	  // Solve X_internal_1
+	  tmp.vmult (system_rhs, Xn);
 	  std::map<types::global_dof_index, double> boundary_values;
 	  VectorTools::interpolate_boundary_values (dof_handler, 0,
 						    ZeroFunction<2> (),
 						    boundary_values);
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
-					      Xnp1, system_rhs);
+					      X_internal_1, system_rhs);
 	  VectorTools::interpolate_boundary_values (dof_handler, 1,
 						    ConstantFunction<2> (0.),
 						    boundary_values);
 	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
-					      Xnp1, system_rhs);
-
-	  solve_time_step ();
+					      X_internal_1, system_rhs);
+	  solve_time_step (X_internal_1);
+	  // Solve X_internal_2
+	  A.vmult (system_rhs, Xn);
+	  E.vmult (tmp_V, X_internal_1);
+	  tmp_V *= 0.5 * time_step;
+	  system_rhs -= tmp_V;
+	  VectorTools::interpolate_boundary_values (dof_handler, 0,
+						    ZeroFunction<2> (),
+						    boundary_values);
+	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
+					      X_internal_2, system_rhs);
+	  VectorTools::interpolate_boundary_values (dof_handler, 1,
+						    ConstantFunction<2> (0.),
+						    boundary_values);
+	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
+					      X_internal_2, system_rhs);
+	  solve_time_step (X_internal_2);
+	  // Solve X_internal_3
+	  A.vmult (system_rhs, Xn);
+	  E.vmult (tmp_V, X_internal_2);
+	  tmp_V *= time_step;
+	  system_rhs -= tmp_V;
+	  VectorTools::interpolate_boundary_values (dof_handler, 0,
+						    ZeroFunction<2> (),
+						    boundary_values);
+	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
+					      X_internal_3, system_rhs);
+	  VectorTools::interpolate_boundary_values (dof_handler, 1,
+						    ConstantFunction<2> (0.),
+						    boundary_values);
+	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
+					      X_internal_3, system_rhs);
+	  solve_time_step (X_internal_3);
+	  // Solve Xnp1
+	  tmp.copy_from (A);
+	  tmp.add (-1 / 6 * time_step, E);
+	  tmp.vmult (system_rhs, Xn);
+	  E.vmult (tmp_V, X_internal_1);
+	  tmp_V *= 1 / 3 * time_step;
+	  system_rhs -= tmp_V;
+	  E.vmult (tmp_V, X_internal_2);
+	  tmp_V *= 1 / 3 * time_step;
+	  system_rhs -= tmp_V;
+	  E.vmult (tmp_V, X_internal_3);
+	  tmp_V *= 1 / 6 * time_step;
+	  system_rhs -= tmp_V;
+	  VectorTools::interpolate_boundary_values (dof_handler, 0,
+						    ZeroFunction<2> (),
+						    boundary_values);
+	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
+					      X_internal_3, system_rhs);
+	  VectorTools::interpolate_boundary_values (dof_handler, 1,
+						    ConstantFunction<2> (0.),
+						    boundary_values);
+	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
+					      X_internal_3, system_rhs);
+	  solve_time_step (Xnp1);
 
 	  Xn = Xnp1;
 	  solution_store[0][timestep_number] = time;
@@ -830,25 +921,25 @@ namespace Step26
 	}
 
 //       write solution;
-//	{
-//	  FILE * fp;
-//	  fp = fopen ("solution_store.txt", "w+");
-//	  for (int i = 0; i < N + 1; i++)
-//	    {
-//	      for (int j = 0; j < total_time_step; j++)
-//		fprintf (fp, "%2.15f,", solution_store[i][j]);
-//	      fprintf (fp, "\n");
-//	    }
-//
-//	  fclose (fp);
-//	}
+	{
+	  FILE * fp;
+	  fp = fopen ("solution_store.txt", "w+");
+	  for (int i = 0; i < N + 1; i++)
+	    {
+	      for (int j = 0; j < total_time_step; j++)
+		fprintf (fp, "%2.15f,", solution_store[i][j]);
+	      fprintf (fp, "\n");
+	    }
+
+	  fclose (fp);
+	}
 
 //      scanf ("%d", &d);
 
       //   integrate for f0
       //   TODO:change this to better integration method
 
-//      printf ("f0: \n");
+      printf ("f0: \n");
       for (int i = 0; i < N; i++)
 	{
 	  f0[i] = 0.0;
@@ -860,10 +951,10 @@ namespace Step26
 		  * solution_store[i + 1][total_time_step - j - 1 - 1];
 	      f0[i] = f0[i] + 0.5 * time_step * (value_left + value_right);
 	    }
-//	  printf ("%0.16f \n", f0[i]);
+	  printf ("%0.16f \n", f0[i]);
 	}
 
-//      scanf ("%d", &de);
+      scanf ("%d", &de);
       for (int i = 1; i < N - 1; i++)
 	{
 	  out[i] = f0_given[i] - f0[i];
@@ -975,8 +1066,8 @@ main ()
       err = 0.00000001;
       double* x_nr = dvector (1, N - 2);
       for (int i = 1; i < N - 1; i++)
-	x_nr[i] = yita_middle[i];
-//	x_nr[i] = 0.;
+//	x_nr[i] = yita_middle[i];
+	x_nr[i] = 0.;
 
 //      for (int i = 1; i < N - 1; i++)
 //	printf ("x_nr[%d]=%f \n", i, x_nr[i]);
@@ -993,24 +1084,24 @@ main ()
 //      heat_equation_solver.run_experiemnt ();
 //      return 0;
 
-//      double* rere = (double*) malloc (sizeof(double) * 200);
-//      rere = heat_equation_solver.run ();
-//      for (int i = 0; i < N; i++)
-//	printf ("f0_given-f0[%d]=%2.15f \n", i, rere[i]);
+      double* rere = (double*) malloc (sizeof(double) * 200);
+      rere = heat_equation_solver.run ();
+      for (int i = 0; i < N; i++)
+	printf ("f0_given-f0[%d]=%2.15f \n", i, rere[i]);
 
-      for (int i = 0; i < 3; i++)
-	{
-	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
-	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
-	  free_dvector (x_nr, 1, N - 2);
-	  N = heat_equation_solver.get_N ();
-	  x_nr = dvector (1, N - 2);
-	  for (int i = 1; i < N - 1; i++)
-	    x_nr[i] = interpolated_solution_yita_1D[i];
-	  heat_equation_solver.set_yita_middle_1D (x_nr);
-	  f0_given = (double*) realloc (f0_given, N * sizeof(double));
-	  local_iteration = 0;
-	}
+//      for (int i = 0; i < 2; i++)
+//	{
+//	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
+//	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
+//	  free_dvector (x_nr, 1, N - 2);
+//	  N = heat_equation_solver.get_N ();
+//	  x_nr = dvector (1, N - 2);
+//	  for (int i = 1; i < N - 1; i++)
+//	    x_nr[i] = interpolated_solution_yita_1D[i];
+//	  heat_equation_solver.set_yita_middle_1D (x_nr);
+//	  f0_given = (double*) realloc (f0_given, N * sizeof(double));
+//	  local_iteration = 0;
+//	}
 
     }
   catch (std::exception &exc)
