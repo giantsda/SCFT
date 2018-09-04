@@ -807,7 +807,7 @@ namespace Step26
       for (int i = 2; i < N; i++)
 	solution_store[i][0] = 1.;
       solution_store[0][0] = 0.;
-      solution_store[N - 1][0] = 0.;
+      solution_store[N][0] = 0.;
 
       /* implicit Eluer*/
 //      for (timestep_number = 1; timestep_number < total_time_step;
@@ -946,7 +946,7 @@ namespace Step26
 //	  fclose (fp);
 //	}
 
-//      scanf ("%d", &d);
+//      scanf ("%d", &de);
 
       //   integrate for f0
       //   TODO:change this to better integration method
