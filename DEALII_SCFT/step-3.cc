@@ -65,7 +65,7 @@ int PRINT, local_iteration = 0;
 int de; // My debug varaibel
 
 double **
-Matcreate (int r, int c)
+Matcreate (int r, int c) // The elements in the rows are next to each other.
 {
   double** A = (double **) malloc (sizeof(double *) * r);
   A[0] = (double *) malloc (sizeof(double) * c * r);
@@ -194,8 +194,8 @@ namespace Step26
 				   const unsigned int component) const
     {
       (void) component;
-      Assert(component == 0, ExcIndexRange(component, 0, 1));
-      Assert(dim == 2, ExcNotImplemented());
+      Assert(component == 0, ExcIndexRange (component, 0, 1));
+      Assert(dim == 2, ExcNotImplemented ());
       if (p[0] == 0. || p[0] == 3.72374)
 	return 0.;
       else
@@ -206,7 +206,7 @@ namespace Step26
     HeatEquation<dim>::HeatEquation (double tau, int N, int total_time_step,
 				     double L, double* yita) :
 	tau (tau), fe (1), dof_handler (triangulation), time (0.0), time_step (
-	    1. / 2047), timestep_number (0), N (N), total_time_step (
+	    1. / (total_time_step - 1)), timestep_number (0), N (N), total_time_step (
 	    total_time_step), L (L), yita_middle_1D (yita), refine_times (0)
     {
       time_step = 1. / (total_time_step - 1);
@@ -231,7 +231,7 @@ namespace Step26
       tau = other.tau;
       refine_times = other.refine_times;
       time = other.time;
-      time_step = 1. / 2047;
+      time_step = other.time_step;
       timestep_number = other.timestep_number;
       N = other.N;
       total_time_step = other.total_time_step;
@@ -331,9 +331,9 @@ namespace Step26
   template<int dim>
     HeatEquation<dim>::HeatEquation (HeatEquation&& other) :
 	tau (other.tau), refine_times (other.refine_times), fe (other.fe), dof_handler (
-	    other.dof_handler), time (other.time), time_step (1. / 2047), timestep_number (
-	    other.timestep_number), N (other.N), total_time_step (
-	    other.total_time_step), L (other.L), yita_middle_1D (
+	    other.dof_handler), time (other.time), time_step (
+	    1. / other.time_step), timestep_number (other.timestep_number), N (
+	    other.N), total_time_step (other.total_time_step), L (other.L), yita_middle_1D (
 	    other.yita_middle_1D)
     {
       time_step = 1. / (total_time_step - 1);
@@ -753,7 +753,7 @@ namespace Step26
 	      GridIn<dim> grid_in;
 	      grid_in.attach_triangulation (triangulation);
 	      std::ifstream input_file ("yita_full_2D_N=043.msh");
-	      Assert(dim == 2, ExcInternalError());
+	      Assert(dim == 2, ExcInternalError ());
 	      grid_in.read_msh (input_file);
 	    }
 	  setup_system (); // The first time, the triangulation is generated and system is set up. The
@@ -798,7 +798,7 @@ namespace Step26
       for (int i = 2; i < N; i++)
 	solution_store[i][0] = 1.;
       solution_store[0][0] = 0.;
-      solution_store[N - 1][0] = 0.;
+      solution_store[N][0] = 0.;
 
       for (timestep_number = 1; timestep_number < total_time_step;
 	  timestep_number++)
@@ -830,40 +830,36 @@ namespace Step26
 	}
 
 //       write solution;
-//	{
-//	  FILE * fp;
-//	  fp = fopen ("solution_store.txt", "w+");
-//	  for (int i = 0; i < N + 1; i++)
-//	    {
-//	      for (int j = 0; j < total_time_step; j++)
-//		fprintf (fp, "%2.15f,", solution_store[i][j]);
-//	      fprintf (fp, "\n");
-//	    }
-//
-//	  fclose (fp);
-//	}
 
-//      scanf ("%d", &d);
+	{
+	  FILE * fp;
+	  fp = fopen ("solution_store.txt", "w+");
+	  for (int i = 0; i < N + 1; i++)
+	    {
+	      for (int j = 0; j < total_time_step; j++)
+		fprintf (fp, "%2.15f,", solution_store[i][j]);
+	      fprintf (fp, "\n");
+	    }
 
-      //   integrate for f0
-      //   TODO:change this to better integration method
+	  fclose (fp);
+	}
+//      scanf ("%d", &de);
 
-//      printf ("f0: \n");
+      /*   integrate for f0   */
+      double v_for_romint[total_time_step];
       for (int i = 0; i < N; i++)
 	{
-	  f0[i] = 0.0;
-	  for (int j = 0; j < total_time_step - 1; j++)
+	  for (int j = 0; j < total_time_step; j++)
 	    {
-	      double value_left = solution_store[i + 1][j]
-		  * solution_store[i + 1][total_time_step - j - 1];
-	      double value_right = solution_store[i + 1][j + 1]
-		  * solution_store[i + 1][total_time_step - j - 1 - 1];
-	      f0[i] = f0[i] + 0.5 * time_step * (value_left + value_right);
+	      v_for_romint[j] = solution_store[i + 1][j]
+		  * solution_store[i + 1][total_time_step - j];
 	    }
-//	  printf ("%0.16f \n", f0[i]);
+	  f0[i] = romint (v_for_romint, total_time_step,
+			  1. / (total_time_step - 1));
+//	  printf ("f0[%d]=%2.15f\n", i, f0[i]);
 	}
-
 //      scanf ("%d", &de);
+
       for (int i = 1; i < N - 1; i++)
 	{
 	  out[i] = f0_given[i] - f0[i];
@@ -879,7 +875,7 @@ namespace Step26
       GridIn<dim> grid_in;
       grid_in.attach_triangulation (triangulation);
       std::ifstream input_file ("yita_full_2D_N=033.msh");
-      Assert(dim == 2, ExcInternalError());
+      Assert(dim == 2, ExcInternalError ());
       grid_in.read_msh (input_file);
 
       refine_times++;
@@ -982,7 +978,8 @@ main ()
 //	printf ("x_nr[%d]=%f \n", i, x_nr[i]);
 //      scanf ("%d", &de);
 
-      Step26::HeatEquation<2> other (tau, N, 2048, L, x_nr); // This tells the yita_middle_1D and x_nr has the same address;
+      Step26::HeatEquation<2> other (tau, N, 2049, L, x_nr); /* This tells the yita_middle_1D and x_nr has the same address;
+       and 2049 are points, 2048 intervals */
       heat_equation_solver = other;
       /*The assignment constructor transfer the address of x_nr
        to heat_equation_solver.yita_middle_1D*/
