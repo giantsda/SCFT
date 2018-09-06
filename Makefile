@@ -30,6 +30,6 @@ run:
 .PHONY: clean
 
 clean :
-	rm *.o 1d_fem
+	rm *.o 1d_fem solution_store.txt
 
  
