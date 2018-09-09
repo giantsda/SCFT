@@ -800,26 +800,38 @@ namespace Step26
       solution_store[0][0] = 0.;
       solution_store[N][0] = 0.;
 
+      std::map<types::global_dof_index, double> boundary_values_l,
+	  boundary_values_r;
+      VectorTools::interpolate_boundary_values (dof_handler, 0,
+						ZeroFunction<2> (),
+						boundary_values_l);
+      MatrixTools::apply_boundary_values (boundary_values_l, system_matrix,
+					  Xnp1, system_rhs);
+      VectorTools::interpolate_boundary_values (dof_handler, 1,
+						ConstantFunction<2> (0.),
+						boundary_values_r);
+      MatrixTools::apply_boundary_values (boundary_values_r, system_matrix,
+					  Xnp1, system_rhs);
+
       for (timestep_number = 1; timestep_number < total_time_step;
 	  timestep_number++)
 	{
 	  time += time_step;
-
 	  A.vmult (system_rhs, Xn);
-	  std::map<types::global_dof_index, double> boundary_values;
-	  VectorTools::interpolate_boundary_values (dof_handler, 0,
-						    ZeroFunction<2> (),
-						    boundary_values);
-	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
-					      Xnp1, system_rhs);
-	  VectorTools::interpolate_boundary_values (dof_handler, 1,
-						    ConstantFunction<2> (0.),
-						    boundary_values);
-	  MatrixTools::apply_boundary_values (boundary_values, system_matrix,
-					      Xnp1, system_rhs);
+
+	  // Manually apply BC;
+	  for (auto itr = boundary_values_l.begin ();
+	      itr != boundary_values_l.end (); ++itr)
+	    {
+	      system_rhs[itr->first] = itr->second;
+	    }
+	  for (auto itr = boundary_values_r.begin ();
+	      itr != boundary_values_r.end (); ++itr)
+	    {
+	      system_rhs[itr->first] = itr->second;
+	    }
 
 	  solve_time_step ();
-
 	  Xn = Xnp1;
 	  solution_store[0][timestep_number] = time;
 	  for (int i = 0; i < N; i++)
@@ -827,25 +839,26 @@ namespace Step26
 	      solution_store[i + 1][timestep_number] =
 		  Xnp1[solution_table_1D_to_2D.find (i)->second];
 	    }
+
 	}
 
 //       write solution;
 
-	{
-	  FILE * fp;
-	  fp = fopen ("solution_store.txt", "w+");
-	  for (int i = 0; i < N + 1; i++)
-	    {
-	      for (int j = 0; j < total_time_step; j++)
-		fprintf (fp, "%2.15f,", solution_store[i][j]);
-	      fprintf (fp, "\n");
-	    }
-
-	  fclose (fp);
-	}
+//	{
+//	  FILE * fp;
+//	  fp = fopen ("solution_store.txt", "w+");
+//	  for (int i = 0; i < N + 1; i++)
+//	    {
+//	      for (int j = 0; j < total_time_step; j++)
+//		fprintf (fp, "%2.15f,", solution_store[i][j]);
+//	      fprintf (fp, "\n");
+//	    }
+//
+//	  fclose (fp);
+//	}
 //      scanf ("%d", &de);
 
-      /*   integrate for f0   */
+      /*   integrate for f0 use romint   */
       double v_for_romint[total_time_step];
       for (int i = 0; i < N; i++)
 	{
@@ -961,6 +974,7 @@ main ()
 
       // read data from file, also set N;  N=33_for_read.txt
       read_yita_middle_1D (yita_middle, "N=33_for_read.txt", N);
+//      N=5;
       f0_given = (double*) malloc (N * sizeof(double)); // this is the ideal f0;
 
       int check = 1;
@@ -986,14 +1000,6 @@ main ()
 
       /*--------------------------------------------------------------*/
       std::vector<double> interpolated_solution_yita_1D;
-
-//      heat_equation_solver.run_experiemnt ();
-//      return 0;
-
-//      double* rere = (double*) malloc (sizeof(double) * 200);
-//      rere = heat_equation_solver.run ();
-//      for (int i = 0; i < N; i++)
-//	printf ("f0_given-f0[%d]=%2.15f \n", i, rere[i]);
 
       for (int i = 0; i < 3; i++)
 	{
