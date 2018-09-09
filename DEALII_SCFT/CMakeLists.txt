@@ -20,7 +20,7 @@ SET_PROPERTY(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
 SET_PROPERTY(GLOBAL PROPERTY CMAKE_USE_RELATIVE_PATHS TRUE) 
 
 #file(GLOB SOURCES "src/*.cc")
-set(SOURCES ../gaussj.c ../broydn.c ../nrutil.c) # I need them
+set(SOURCES ../gaussj.c ../broydn.c ../nrutil.c ../adm.c) # I need them
 
 set_source_files_properties( ${SOURCES} PROPERTIES LANGUAGE CXX ) #use g++ to bulid them
 

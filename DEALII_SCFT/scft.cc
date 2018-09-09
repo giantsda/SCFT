@@ -64,6 +64,11 @@ int PRINT, local_iteration = 0;
 
 int de; // My debug varaibel
 
+double*
+adm (double *x, int n, int *check, void
+(*funcvmix) (int, double *x, double *xnew),
+     int flag);
+
 double **
 Matcreate (int r, int c) // The elements in the rows are next to each other.
 {
@@ -780,7 +785,7 @@ namespace Step26
 
 //      for (int i = 0; i < 2 * N; i++)
 //	printf ("yita_full_2D[%d]=%2.15f \n", i, yita_full_2D[i]);
-//      scanf ("%d", &d);
+//      scanf ("%d", &de);
 
       system_matrix.copy_from (A);
       system_matrix.add (time_step, B);
@@ -875,7 +880,7 @@ namespace Step26
 
       for (int i = 1; i < N - 1; i++)
 	{
-	  out[i] = f0_given[i] - f0[i];
+	  out[i] = f0_given[i] - f0[i]; // +yita_full_1D[i];  // for adm
 	}
       return out;
     }
@@ -985,8 +990,8 @@ main ()
       err = 0.00000001;
       double* x_nr = dvector (1, N - 2);
       for (int i = 1; i < N - 1; i++)
-	x_nr[i] = yita_middle[i];
-//	x_nr[i] = 0.;
+//	x_nr[i] = yita_middle[i];
+	x_nr[i] = 0.;
 
 //      for (int i = 1; i < N - 1; i++)
 //	printf ("x_nr[%d]=%f \n", i, x_nr[i]);
@@ -1001,8 +1006,9 @@ main ()
       /*--------------------------------------------------------------*/
       std::vector<double> interpolated_solution_yita_1D;
 
-      for (int i = 0; i < 3; i++)
+      for (int i = 0; i < 10; i++)
 	{
+//	  adm (x_nr, N - 2, &check, SCFT_wrapper, 1);
 	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
 	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
 	  free_dvector (x_nr, 1, N - 2);
