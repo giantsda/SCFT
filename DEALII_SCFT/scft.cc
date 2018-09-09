@@ -785,7 +785,7 @@ namespace Step26
 
 //      for (int i = 0; i < 2 * N; i++)
 //	printf ("yita_full_2D[%d]=%2.15f \n", i, yita_full_2D[i]);
-//      scanf ("%d", &d);
+//      scanf ("%d", &de);
 
       system_matrix.copy_from (A);
       system_matrix.add (time_step, B);
@@ -880,7 +880,7 @@ namespace Step26
 
       for (int i = 1; i < N - 1; i++)
 	{
-	  out[i] = f0_given[i] - f0[i]+yita_full_2D[i];
+	  out[i] = f0_given[i] - f0[i]; // +yita_full_1D[i];  // for adm
 	}
       return out;
     }
@@ -990,8 +990,8 @@ main ()
       err = 0.00000001;
       double* x_nr = dvector (1, N - 2);
       for (int i = 1; i < N - 1; i++)
-	x_nr[i] = yita_middle[i];
-//	x_nr[i] = 0.;
+//	x_nr[i] = yita_middle[i];
+	x_nr[i] = 0.;
 
 //      for (int i = 1; i < N - 1; i++)
 //	printf ("x_nr[%d]=%f \n", i, x_nr[i]);
@@ -1006,24 +1006,20 @@ main ()
       /*--------------------------------------------------------------*/
       std::vector<double> interpolated_solution_yita_1D;
 
-      int ii;
-      adm (x_nr, N - 2, &ii, SCFT_wrapper, 0);
-
-      return 0;
-
-//      for (int i = 0; i < 1; i++)
-//	{
-//	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
-//	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
-//	  free_dvector (x_nr, 1, N - 2);
-//	  N = heat_equation_solver.get_N ();
-//	  x_nr = dvector (1, N - 2);
-//	  for (int i = 1; i < N - 1; i++)
-//	    x_nr[i] = interpolated_solution_yita_1D[i];
-//	  heat_equation_solver.set_yita_middle_1D (x_nr);
-//	  f0_given = (double*) realloc (f0_given, N * sizeof(double));
-//	  local_iteration = 0;
-//	}
+      for (int i = 0; i < 10; i++)
+	{
+//	  adm (x_nr, N - 2, &check, SCFT_wrapper, 1);
+	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
+	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
+	  free_dvector (x_nr, 1, N - 2);
+	  N = heat_equation_solver.get_N ();
+	  x_nr = dvector (1, N - 2);
+	  for (int i = 1; i < N - 1; i++)
+	    x_nr[i] = interpolated_solution_yita_1D[i];
+	  heat_equation_solver.set_yita_middle_1D (x_nr);
+	  f0_given = (double*) realloc (f0_given, N * sizeof(double));
+	  local_iteration = 0;
+	}
 
     }
   catch (std::exception &exc)
