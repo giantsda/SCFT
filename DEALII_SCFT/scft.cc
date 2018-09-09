@@ -64,6 +64,11 @@ int PRINT, local_iteration = 0;
 
 int de; // My debug varaibel
 
+double*
+adm (double *x, int n, int *check, void
+(*funcvmix) (int, double *x, double *xnew),
+     int flag);
+
 double **
 Matcreate (int r, int c) // The elements in the rows are next to each other.
 {
@@ -875,7 +880,7 @@ namespace Step26
 
       for (int i = 1; i < N - 1; i++)
 	{
-	  out[i] = f0_given[i] - f0[i];
+	  out[i] = f0_given[i] - f0[i]+yita_full_2D[i];
 	}
       return out;
     }
@@ -1001,19 +1006,24 @@ main ()
       /*--------------------------------------------------------------*/
       std::vector<double> interpolated_solution_yita_1D;
 
-      for (int i = 0; i < 3; i++)
-	{
-	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
-	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
-	  free_dvector (x_nr, 1, N - 2);
-	  N = heat_equation_solver.get_N ();
-	  x_nr = dvector (1, N - 2);
-	  for (int i = 1; i < N - 1; i++)
-	    x_nr[i] = interpolated_solution_yita_1D[i];
-	  heat_equation_solver.set_yita_middle_1D (x_nr);
-	  f0_given = (double*) realloc (f0_given, N * sizeof(double));
-	  local_iteration = 0;
-	}
+      int ii;
+      adm (x_nr, N - 2, &ii, SCFT_wrapper, 0);
+
+      return 0;
+
+//      for (int i = 0; i < 1; i++)
+//	{
+//	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
+//	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
+//	  free_dvector (x_nr, 1, N - 2);
+//	  N = heat_equation_solver.get_N ();
+//	  x_nr = dvector (1, N - 2);
+//	  for (int i = 1; i < N - 1; i++)
+//	    x_nr[i] = interpolated_solution_yita_1D[i];
+//	  heat_equation_solver.set_yita_middle_1D (x_nr);
+//	  f0_given = (double*) realloc (f0_given, N * sizeof(double));
+//	  local_iteration = 0;
+//	}
 
     }
   catch (std::exception &exc)
