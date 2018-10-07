@@ -214,7 +214,7 @@ void gauher(float x[], float w[], int n);
 void gaujac(float x[], float w[], int n, float alf, float bet);
 void gaulag(float x[], float w[], int n, float alf);
 void gauleg(float x1, float x2, float x[], float w[], int n);
-void gaussj(float **a, int n, float **b, int m);
+int  gaussj(float **a, int n, float **b, int m);
 void gcf(float *gammcf, float a, float x, float *gln);
 float golden(float ax, float bx, float cx, float (*f)(float), float tol,
     float *xmin);
