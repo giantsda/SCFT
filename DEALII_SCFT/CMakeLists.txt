@@ -1,5 +1,5 @@
 # Set the name of the project and target:
-SET(TARGET "scft")
+SET(TARGET "drivescft")
 PROJECT(${TARGET}) #set project
 
 # Declare all source files the target consists of. Here, this is only
@@ -13,31 +13,36 @@ PROJECT(${TARGET}) #set project
 # in the "CMake in user projects" page accessible from the "User info"
 # page of the documentation.
 SET(TARGET_SRC
-  scft.cc
+  drivescft.cc
   )
 
 SET_PROPERTY(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
 SET_PROPERTY(GLOBAL PROPERTY CMAKE_USE_RELATIVE_PATHS TRUE) 
 
 #file(GLOB SOURCES "src/*.cc")
-set(SOURCES ../gaussj.c ../broydn.c ../nrutil.c ../adm.c) # I need them
+ 
+include_directories( include/ ) #provide .h
+
+set(SOURCES  src/scft.cc src/ADM_chen_C.c src/broydn.c src/gaussj.c src/nrutil.c src/scft_util.cc src/romint.c src/polint.c) # I need them
+
+message(STATUS "source files is :" ${SOURCES})
 
 set_source_files_properties( ${SOURCES} PROPERTIES LANGUAGE CXX ) #use g++ to bulid them
 
-ADD_LIBRARY(mylib  ${SOURCES}) # for link to scft
 
- 
+include_directories( /home/chen/Desktop/software/dealii-9.0.0/install/include  /usr/lib/x86_64-linux-gnu/openmpi/include) #provide .h
+
+
+
 # No sensible run target can be defined for this example step
-SET(TARGET_RUN "./scft")
+SET(TARGET_RUN "./drivescft")
 
-include_directories( ${CMAKE_CURRENT_BINARY_DIR}/../ ) #provide .h
- 
 
-find_library(.. libNR_CPP.so)
-link_directories(${CMAKE_CURRENT_BINARY_DIR}/../) # -L..
- 
- 
 
+#find_library(.. libNR_CPP.so)
+#link_directories(${CMAKE_CURRENT_BINARY_DIR}/../) # -L..
+ 
+ 
 # Usually, you will not need to modify anything beyond this point...
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)
@@ -55,11 +60,14 @@ ENDIF()
 
 
 DEAL_II_INITIALIZE_CACHED_VARIABLES()
-SET(CLEAN_UP_FILES *.o scft *.vtk solution_store.txt solution_yita_1D*.txt *.msh)
- 
-DEAL_II_INVOKE_AUTOPILOT()
+SET(CLEAN_UP_FILES *.o scft drivescft *.vtk solution_store.txt solution_yita_1D*.txt *.msh)
 
-TARGET_LINK_LIBRARIES(scft  libNR_CPP.so mylib)
+DEAL_II_INVOKE_AUTOPILOT()
  
+ADD_LIBRARY(mylib  ${SOURCES}) # for link to scft
+DEAL_II_SETUP_TARGET(mylib)
+TARGET_LINK_LIBRARIES(drivescft mylib)
+ 
+
 
 
