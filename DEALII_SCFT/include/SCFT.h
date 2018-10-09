@@ -122,7 +122,6 @@ namespace SCFT
       double** solution_store;
       double L;
       Vector<double> f0;
-      Vector<double> yita_middle_1D;
       Vector<double> yita_full_1D;
       Vector<double> yita_full_2D;
       Vector<double> out;

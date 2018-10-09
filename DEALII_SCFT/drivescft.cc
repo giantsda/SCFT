@@ -221,9 +221,9 @@ template<int dim>
 
     for (int i = 0; i < N - 2; i++)
       {
-	out[i] = f0_given[i + 1] - f0[i + 1];	// +yita_full_1D[i];  // for adm
+	out[i] = f0_given[i] - f0[i];	// +yita_full_1D[i];  // for adm
       }
-    return &out[0];
+    return &out[1];
   }
 
 void

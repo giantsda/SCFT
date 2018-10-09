@@ -192,23 +192,24 @@ namespace SCFT
     void
     HeatEquation<dim>::get_f0_given ()
     {
+      f0_given.reinit (N);
       for (int i = 0; i < N; i++)
-	f0[i] = 1.;
-      std::vector<double> x(N);
-      get_x(x);
+	f0_given[i] = 1.;
+      std::vector<double> x (N);
+      get_x (x);
       for (int i = 0; i < N; i++)
 	{
 	  if (x[i] <= tau)
 	    {
-	      f0[i] = pow (
+	      f0_given[i] = pow (
 		  (exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) - 1), 2)
 		  / pow (
 		      ((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) + 1)),
 		      2);
-	      if (std::isnan (f0[i]))
-		f0[i] = 1.;
+	      if (std::isnan (f0_given[i]))
+		f0_given[i] = 1.;
 
-	      f0[N - i - 1] = f0[i];
+	      f0_given[N - i - 1] = f0_given[i];
 
 	    }
 	  else
@@ -244,11 +245,6 @@ namespace SCFT
       Xn.reinit (dof_handler.n_dofs ());
       system_rhs.reinit (dof_handler.n_dofs ());
       N = triangulation.n_active_cells () + 1;
-      f0_given.reinit (N);
-      get_f0_given ();
-      std::vector<double> x;
-      x.resize (N);
-      get_x (x);
       get_f0_given ();
       update_internal_data ();
       build_solution_table ();
@@ -383,7 +379,6 @@ namespace SCFT
       //	      std::cout << P << "->" << loc_dof_indices[i] << std::endl;
       //	    }
       //	}
-
       //      scanf ("%d", &de);
     }
 
