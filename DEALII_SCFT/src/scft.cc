@@ -24,7 +24,7 @@ namespace SCFT
       f0.reinit (N);
       yita_full_1D.reinit (N);
       yita_full_2D.reinit (2 * N);
-      out.reinit (N - 1);
+      out.reinit (N);
       f0_given.reinit (N);
       local_iteration = 0;
     }
@@ -181,7 +181,7 @@ namespace SCFT
       f0.reinit (N);
       yita_full_1D.reinit (N);
       yita_full_2D.reinit (2 * N);
-      out.reinit (N - 1);
+      out.reinit (N);
       solution_table_1D_to_2D.clear ();
       solution_table_2D_to_1D.clear ();
       solution_table_x_to_2D.clear ();

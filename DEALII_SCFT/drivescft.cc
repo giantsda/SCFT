@@ -82,10 +82,11 @@ namespace dealii
 
 template<int dim>
   double *
-  SCFT::HeatEquation<dim>::run (double* yita_full_1D_in)
+  SCFT::HeatEquation<dim>::run (double* yita_middle_1D_in)
   {
-
-
+    std::vector<double> yita_full_1D (N, 0.);
+    for (int i = 0; i < N - 2; i++)
+      yita_full_1D[i + 1] = yita_middle_1D_in[i];
     if (refine_times == 0)
       {
 	if (1)
@@ -121,7 +122,7 @@ template<int dim>
     for (int i = 0; i < 2 * N; i++)
       {
 	int j = solution_table_2D_to_1D.find (i)->second;
-	yita_full_2D[i] = yita_full_1D_in[j];
+	yita_full_2D[i] = yita_full_1D[j];
       }
 
 //      for (int i = 0; i < 2 * N; i++)
@@ -219,9 +220,9 @@ template<int dim>
       }
 //      scanf ("%d", &de);
 
-    for (int i = 0; i < N - 2; i++)
+    for (int i = 0; i < N; i++)
       {
-	out[i] = f0_given[i] - f0[i];	// +yita_full_1D[i];  // for adm
+	out[i] = f0_given[i] - f0[i];// +yita_full_1D[i];  // for adm // so f0 and f0_given are full sized and so out is full sized.
       }
     return &out[1];
   }
@@ -229,7 +230,7 @@ template<int dim>
 void
 SCFT_wrapper (double * in, double * out, int N, struct parameterDumper* p)
 {
-  double* res = heat_equation_solver.run (in);
+  double* res = heat_equation_solver.run (&in[0]);
   N = heat_equation_solver.get_N ();
   for (int i = 0; i < N - 2; i++)
     out[i] = res[i];
@@ -243,7 +244,8 @@ SCFT_wrapper (double * in, double * out, int N, struct parameterDumper* p)
   heat_equation_solver.set_local_iteration (local_interation + 1);
 }
 
-template class std::vector<double>; // enable std::vector::size()
+template class std::vector<double>;
+// enable std::vector::size()
 
 int
 main ()
@@ -258,24 +260,25 @@ main ()
       double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
       read_yita_middle_1D (x_old, "inputFiles/N=33_for_read.txt", N); // read data from file, also set N;
       HeatEquation<2> other (tau, N, 2049, L); /* 2049 are points, 2048 intervals */
-      printf("N=%d\n",x_old.size());
+      printf ("N=%d\n", x_old.size ());
       heat_equation_solver = other; // I need this global class to do stuffs
       std::vector<double> interpolated_solution_yita_1D;
       struct parameterDumper p;
-      double* out=heat_equation_solver.run (&x_old[0]);
+//      double* out=heat_equation_solver.run (&x_old[0]);
 
-      for(int i=0;i<N;i++)
-	printf("out[%d]=%2.15f\n",i,out[i]);
+
+//      for(int i=0;i<N;i++)
+//	printf("out[%d]=%2.15f\n",i,out[i]);
 //      /*--------------------------------------------------------------*/
-//      for (int i = 0; i < 10; i++)
-//	{
-//	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 3000, N - 2, &p);
-//	  //	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
-//	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
-//	  x_old=interpolated_solution_yita_1D;
+      for (int i = 0; i < 10; i++)
+	{
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 3000, N - 2, &p);
+	  //	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
+	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
+	  x_old=interpolated_solution_yita_1D;
 //	  f0_given.reinit(heat_equation_solver.get_N ());
-//	  heat_equation_solver.set_local_iteration(0);
-//	}
+	  heat_equation_solver.set_local_iteration(0);
+	}
     }
   catch (std::exception &exc)
     {
