@@ -17,9 +17,8 @@
 
 int
 adm_chen (void
-(*f) (double*, double*, int, struct parameterDumper*),
-	  double* x_old, double tol, int maxIteration, int n,
-	  struct parameterDumper* p)
+(*f) (int, double*, double*),
+	  double* x_old, double tol, int maxIteration, int n)
 /* It solves a function of type: void f (double* in, double* out, int n, struct parameterDumper* p) p is for some parameters you would like to pass
  * so that global variables can be avoided!
  * x_old is the initial guess; tol is the tolerance; maxIteration is the max iteration number you allowed.
@@ -52,7 +51,7 @@ adm_chen (void
 
   while (err > tol && k <= maxIteration)
     {
-      f (X[k], Y[k], n, p);
+      f (n, X[k], Y[k]);
       double err = 0.; // evaluate err
       for (unsigned int i = 0; i < n; i++)
 	{

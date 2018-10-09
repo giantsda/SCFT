@@ -40,8 +40,7 @@ Matfree (double** A)
 
 int
 adm_chen (void
-(*f) (double*, double*, int, struct parameterDumper*),
-	  double* x_old, double tol, int maxIteration, int n,
-	  struct parameterDumper* p);
+(*f) (int, double*, double*),
+	  double* x_old, double tol, int maxIteration, int n);
 
 #endif /* NR_CHEN_H_ */

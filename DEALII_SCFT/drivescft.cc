@@ -40,13 +40,7 @@
 #include <fstream>
 #include <vector>
 
-//double* f0_given;
-//double **qt, **r, *d, /* qt[1:n,1:n], r[1:n,1:n] and d[1:n] must be allocated in the calling program */
-//err; /* Passed in as the convergence criterion, and returned with the actual residual error */
-//int funcerr, /* Flag for error in evaluating the function in Broyden method */
-//jc; /* For re-use of Jacobian. jc denotes the status of Jacobian calculation: 0 for not calculated,
-// 1 for previously calculated, 2 for currently calculated */
-//int PRINT, local_iteration = 0;
+#define BROYDN
 
 int de; // My debug varaibe
 
@@ -179,6 +173,7 @@ template<int dim>
 	  }
 
 	solve_time_step ();
+
 	Xn = Xnp1;
 	solution_store[0][timestep_number] = time;
 	for (int i = 0; i < N; i++)
@@ -228,14 +223,24 @@ template<int dim>
   }
 
 void
-SCFT_wrapper (double * in, double * out, int N, struct parameterDumper* p)
+SCFT_wrapper (int N, double * in, double * out)
 {
+#ifdef BROYDN
+  double* res = heat_equation_solver.run (&in[1]);
+#else
   double* res = heat_equation_solver.run (&in[0]);
+#endif
   N = heat_equation_solver.get_N ();
+
+#ifdef BROYDN
   for (int i = 0; i < N - 2; i++)
-    out[i] = res[i];
+    out[i + 1] = res[i];
+#else
+  for (int i = 0; i < N - 2; i++)
+  out[i] = res[i];
+#endif
   int local_interation = heat_equation_solver.get_local_iteration ();
-  for (int i = 0; i < N - 2; i++)
+  for (int i = 0; i < N; i++)
     printf (
 	"in[%d]=%2.15f ; out[%d]=%2.15f ; local_iteration:%d refine_times:%d \n",
 	i, in[i], i, out[i], local_interation,
@@ -246,6 +251,17 @@ SCFT_wrapper (double * in, double * out, int N, struct parameterDumper* p)
 
 template class std::vector<double>;
 // enable std::vector::size()
+
+#ifdef BROYDN
+// stuff for broydn
+double* f0_given;
+double **qt, **r, *d, /* qt[1:n,1:n], r[1:n,1:n] and d[1:n] must be allocated in the calling program */
+err; /* Passed in as the convergence criterion, and returned with the actual residual error */
+int funcerr, /* Flag for error in evaluating the function in Broyden method */
+jc; /* For re-use of Jacobian. jc denotes the status of Jacobian calculation: 0 for not calculated,
+ 1 for previously calculated, 2 for currently calculated */
+int PRINT;
+#endif
 
 int
 main ()
@@ -260,24 +276,43 @@ main ()
       double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
       read_yita_middle_1D (x_old, "inputFiles/N=33_for_read.txt", N); // read data from file, also set N;
       HeatEquation<2> other (tau, N, 2049, L); /* 2049 are points, 2048 intervals */
-      printf ("N=%d\n", x_old.size ());
       heat_equation_solver = other; // I need this global class to do stuffs
       std::vector<double> interpolated_solution_yita_1D;
-      struct parameterDumper p;
 //      double* out=heat_equation_solver.run (&x_old[0]);
-
 
 //      for(int i=0;i<N;i++)
 //	printf("out[%d]=%2.15f\n",i,out[i]);
 //      /*--------------------------------------------------------------*/
+
+#ifdef BROYDN
+      int check = 1;
+      qt = dmatrix (1, N - 2, 1, N - 2);
+      r = dmatrix (1, N - 2, 1, N - 2);
+      d = dvector (1, N - 2);
+      jc = 0;
+      err = 0.00000001;
+#endif
+
       for (int i = 0; i < 10; i++)
 	{
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 3000, N - 2, &p);
-	  //	  broydn (x_nr, N - 2, &check, SCFT_wrapper);
+//	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 3000, N - 2);
+	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
+	  heat_equation_solver.print_and_save_yita_1D ();
+	  heat_equation_solver.output_results_for_yita_full_2D ();
+	  heat_equation_solver.output_mesh ();
 	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
-	  x_old=interpolated_solution_yita_1D;
-//	  f0_given.reinit(heat_equation_solver.get_N ());
-	  heat_equation_solver.set_local_iteration(0);
+	  N = heat_equation_solver.get_N ();
+#ifdef BROYDN
+	  free_dmatrix (qt, 1, N - 2, 1, N - 2);
+	  qt = dmatrix (1, N - 2, 1, N - 2);
+	  free_dmatrix (r, 1, N - 2, 1, N - 2);
+	  r = dmatrix (1, N - 2, 1, N - 2);
+	  free_dvector (d, 1, N - 2);
+	  d = dvector (1, N - 2);
+	  jc = 0;
+#endif
+	  x_old = interpolated_solution_yita_1D;
+	  heat_equation_solver.set_local_iteration (0);
 	}
     }
   catch (std::exception &exc)

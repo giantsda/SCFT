@@ -23,9 +23,14 @@ SET_PROPERTY(GLOBAL PROPERTY CMAKE_USE_RELATIVE_PATHS TRUE)
  
 include_directories( include/ ) #provide .h
 
-set(SOURCES  src/scft.cc src/ADM_chen_C.c src/broydn.c src/gaussj.c src/nrutil.c src/scft_util.cc src/romint.c src/polint.c) # I need them
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src/ source_files)
+ 
+message(STATUS "source_files:  "   ${source_files})
+ 
+ 
+set(SOURCES  ${source_files}) # I need them
 
-message(STATUS "source files is :" ${SOURCES})
+#message(STATUS "source files is :" ${SOURCES})
 
 set_source_files_properties( ${SOURCES} PROPERTIES LANGUAGE CXX ) #use g++ to bulid them
 

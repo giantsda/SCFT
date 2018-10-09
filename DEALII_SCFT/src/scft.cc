@@ -158,7 +158,7 @@ namespace SCFT
       //      triangulation.prepare_coarsening_and_refinement ();
       solution_trans.prepare_for_coarsening_and_refinement (previous_solution);
       triangulation.execute_coarsening_and_refinement ();
-//      setup_system ();
+      setup_system ();
       new_solution.reinit (dof_handler.n_dofs ());
       solution_trans.interpolate (previous_solution, new_solution);
 
@@ -215,6 +215,62 @@ namespace SCFT
 	  else
 	    break;
 	}
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::output_results_for_yita_full_2D () const
+    {
+      DataOut<dim> data_out;
+      data_out.attach_dof_handler (dof_handler);
+      data_out.add_data_vector (yita_full_2D, "U");
+      data_out.build_patches ();
+      const std::string filename = "yita_full_2D_N="
+	  + Utilities::int_to_string (get_N (), 3) + ".vtk";
+      std::ofstream output (filename.c_str ());
+      data_out.write_vtk (output);
+      printf ("%s is written. \n", filename.c_str ());
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::output_mesh ()
+    {
+      const std::string filename = "yita_full_2D_N="
+	  + Utilities::int_to_string (get_N (), 3) + ".msh";
+      std::ofstream output (filename.c_str ());
+      GridOutFlags::Msh msh_flags (true, true);
+      GridOut gridOut;
+      gridOut.set_flags (msh_flags);
+      gridOut.write_msh (triangulation, output);
+      printf ("%s is written. \n", filename.c_str ());
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::print_and_save_yita_1D ()
+    {
+      printf ("Solved ! \n middle_solution: N=%d \n", get_N ());
+      // print and write  solution;
+      std::vector<double> x;
+      x.resize (N);
+      get_x (x);
+      FILE * fp;
+      char filename[64], num[64];
+      sprintf (num, "%d", get_N ());
+      strcpy (filename, "solution_yita_1D_N= ");
+      strcat (filename, num);
+      strcat (filename, ".txt");
+
+      fp = fopen (filename, "w+");
+      fprintf (fp, "N= %d \n", get_N ());
+      for (int i = 0; i < N; i++)
+	{
+	  printf ("solution[%d]=%2.15f \n", i, yita_full_1D[i]);
+	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i], yita_full_1D[i]);
+	}
+      fclose (fp);
+      printf ("%s is written. \n", filename);
     }
 
   template<int dim>
@@ -382,61 +438,7 @@ namespace SCFT
       //      scanf ("%d", &de);
     }
 
-  template<int dim>
-    void
-    HeatEquation<dim>::output_results_for_yita_full_2D () const
-    {
-      DataOut<dim> data_out;
-      data_out.attach_dof_handler (dof_handler);
-      data_out.add_data_vector (yita_full_2D, "U");
-      data_out.build_patches ();
-      const std::string filename = "yita_full_2D_N="
-	  + Utilities::int_to_string (get_N (), 3) + ".vtk";
-      std::ofstream output (filename.c_str ());
-      data_out.write_vtk (output);
-      printf ("%s is written. \n", filename.c_str ());
-    }
 
-  template<int dim>
-    void
-    HeatEquation<dim>::output_mesh ()
-    {
-      const std::string filename = "yita_full_2D_N="
-	  + Utilities::int_to_string (get_N (), 3) + ".msh";
-      std::ofstream output (filename.c_str ());
-      GridOutFlags::Msh msh_flags (true, true);
-      GridOut gridOut;
-      gridOut.set_flags (msh_flags);
-      gridOut.write_msh (triangulation, output);
-      printf ("%s is written. \n", filename.c_str ());
-    }
-
-  template<int dim>
-    void
-    HeatEquation<dim>::print_and_save_yita_1D ()
-    {
-      printf ("Solved ! \n middle_solution: N=%d \n", get_N ());
-      // print and write  solution;
-      std::vector<double> x;
-      x.resize (N);
-      get_x (x);
-      FILE * fp;
-      char filename[64], num[64];
-      sprintf (num, "%d", get_N ());
-      strcpy (filename, "solution_yita_1D_N= ");
-      strcat (filename, num);
-      strcat (filename, ".txt");
-
-      fp = fopen (filename, "w+");
-      fprintf (fp, "N= %d \n", get_N ());
-      for (int i = 0; i < N; i++)
-	{
-	  printf ("solution[%d]=%2.15f \n", i, yita_full_1D[i]);
-	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i], yita_full_1D[i]);
-	}
-      fclose (fp);
-      printf ("%s is written. \n", filename);
-    }
 
   template class HeatEquation<2> ;
   template class HeatEquation<3> ;

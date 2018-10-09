@@ -78,6 +78,12 @@ namespace SCFT
       run_experiemnt ();
       void
       get_f0_given ();
+      void
+      output_results_for_yita_full_2D () const;
+      void
+      output_mesh ();
+      void
+      print_and_save_yita_1D ();
     private:
       void
       setup_system ();
@@ -87,12 +93,6 @@ namespace SCFT
       output_results () const;
       void
       build_solution_table ();
-      void
-      output_results_for_yita_full_2D () const;
-      void
-      output_mesh ();
-      void
-      print_and_save_yita_1D ();
 
     private:
       // private data
