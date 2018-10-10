@@ -70,6 +70,7 @@ namespace SCFT
     void
     HeatEquation<dim>::get_x (std::vector<double> & in)
     {
+      in.resize (N);
       typename Triangulation<dim>::active_vertex_iterator vertex =
 	  triangulation.begin_active_vertex (), endv =
 	  triangulation.end_vertex ();
@@ -195,7 +196,7 @@ namespace SCFT
       f0_given.reinit (N);
       for (int i = 0; i < N; i++)
 	f0_given[i] = 1.;
-      std::vector<double> x (N);
+      std::vector<double> x;
       get_x (x);
       for (int i = 0; i < N; i++)
 	{
@@ -248,12 +249,11 @@ namespace SCFT
 
   template<int dim>
     void
-    HeatEquation<dim>::print_and_save_yita_1D ()
+    HeatEquation<dim>::print_and_save_yita_1D (std::vector<double> solution)
     {
       printf ("Solved ! \n middle_solution: N=%d \n", get_N ());
       // print and write  solution;
       std::vector<double> x;
-      x.resize (N);
       get_x (x);
       FILE * fp;
       char filename[64], num[64];
@@ -264,10 +264,10 @@ namespace SCFT
 
       fp = fopen (filename, "w+");
       fprintf (fp, "N= %d \n", get_N ());
-      for (int i = 0; i < N; i++)
+      for (int i = 0; i < solution.size (); i++)
 	{
-	  printf ("solution[%d]=%2.15f \n", i, yita_full_1D[i]);
-	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i], yita_full_1D[i]);
+	  printf ("solution[%d]=%2.15f \n", i, solution[i]);
+	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i], solution[i]);
 	}
       fclose (fp);
       printf ("%s is written. \n", filename);
@@ -437,8 +437,6 @@ namespace SCFT
       //	}
       //      scanf ("%d", &de);
     }
-
-
 
   template class HeatEquation<2> ;
   template class HeatEquation<3> ;

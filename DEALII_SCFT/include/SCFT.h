@@ -38,6 +38,7 @@
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/grid_out.h>
 #include "NR_chen.h"
+#include <vector>
 
 namespace SCFT
 {
@@ -83,7 +84,7 @@ namespace SCFT
       void
       output_mesh ();
       void
-      print_and_save_yita_1D ();
+      print_and_save_yita_1D (std::vector<double> solution);
     private:
       void
       setup_system ();

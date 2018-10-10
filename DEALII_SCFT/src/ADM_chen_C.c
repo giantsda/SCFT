@@ -35,7 +35,7 @@ adm_chen (void
 {
   // n is the size of the vector problem
   int k = 0; // kth iteration
-  double lmd = 0.01; // relaxzation factor
+  double lmd = 0.999; // relaxzation factor
   double lk = lmd;
   int m;
   int nm = DMIN(30, n);
