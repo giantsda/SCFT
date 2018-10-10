@@ -69,6 +69,8 @@ while (found==0 && iter<=imax)
     fprintf ('  %e\n', err);
     if (err < ee)
         found = 1;
+        fprintf("broydn_wq: solved successfully!\nThe solution is:\n");
+        fprintf('%2.15f\n',Xr);
         break;
     elseif (iter == imax)
         found = 2;
@@ -88,4 +90,4 @@ while (found==0 && iter<=imax)
 %     pause()
 end
 
-iiii=11
+ 
