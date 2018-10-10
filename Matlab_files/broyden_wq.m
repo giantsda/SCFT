@@ -22,7 +22,7 @@ for i = 1:n
         err = abs(Y(i));
     end
 end
-fprintf (' %2d ', iter);
+fprintf ('n=%d,  %2d ',n, iter);
 for i = 1:n
     fprintf ('  %.14e', Xr(i));
 end
@@ -69,7 +69,7 @@ while (found==0 && iter<=imax)
     fprintf ('  %e\n', err);
     if (err < ee)
         found = 1;
-        fprintf("broydn_wq: solved successfully!\nThe solution is:\n");
+        fprintf("broydn_wq: n=%d solved successfully!\nThe solution is:\n",n);
         fprintf('%2.15f\n',Xr);
         break;
     elseif (iter == imax)

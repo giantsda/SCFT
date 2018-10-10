@@ -863,19 +863,21 @@ namespace Step26
 //	}
 //      scanf ("%d", &de);
 
-      /*   integrate for f0 use romint   */
-      double v_for_romint[total_time_step];
+  //      printf ("f0: \n");
       for (int i = 0; i < N; i++)
 	{
-	  for (int j = 0; j < total_time_step; j++)
+	  f0[i] = 0.0;
+	  for (int j = 0; j < total_time_step - 1; j++)
 	    {
-	      v_for_romint[j] = solution_store[i + 1][j]
-		  * solution_store[i + 1][total_time_step - j];
+	      double value_left = solution_store[i + 1][j]
+		  * solution_store[i + 1][total_time_step - j - 1];
+	      double value_right = solution_store[i + 1][j + 1]
+		  * solution_store[i + 1][total_time_step - j - 1 - 1];
+	      f0[i] = f0[i] + 0.5 * time_step * (value_left + value_right);
 	    }
-	  f0[i] = romint (v_for_romint, total_time_step,
-			  1. / (total_time_step - 1));
-//	  printf ("f0[%d]=%2.15f\n", i, f0[i]);
+//	  printf ("%0.16f \n", f0[i]);
 	}
+
 //      scanf ("%d", &de);
 
       for (int i = 1; i < N - 1; i++)

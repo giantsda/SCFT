@@ -7,7 +7,6 @@ for cell=1:N-1
     left=node(cell);
     right=node(cell+1);
     error(cell,2)=abs((solution(cell+1)-solution(cell))/(node(cell+1)-node(cell)));
-    
 end
 error(:,1)=1:N-1;
 refine=[];

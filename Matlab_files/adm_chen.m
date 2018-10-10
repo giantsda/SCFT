@@ -1,23 +1,18 @@
-function [x_old,found] = adm_chen (F, n, x_old, tol, maxIteration,lmd)
-% lmd = 0.9;
-lk = lmd;
+function [x_old,found] = adm_chen (F, n, x_old, tol, maxIteration,lmd_in)
 found=0;
-nm=min(30,n);
-
 kGlobal = 0;
 X_end = x_old;
-err=Inf;
 
 Y = F(X_end);
 err=max(abs(Y));
-fprintf("adm_chen: Before solving, error=%2.15f \n",err);
-if err>1
-    fprintf("adm_chen: Before solving, error>1 Continue? \n",err);
+fprintf("adm_chen:n=%d Before solving, error=%2.15f \n",n,err);
+% if err>1
+    fprintf("adm_chen: Before solving, error>1 Continue? \n");
     pause();
-end
+% end
 
 while (err>tol && kGlobal<=maxIteration)
-    [X_end, kLocal]=mixing(F,n,X_end,tol,kGlobal,maxIteration);
+    [X_end, kLocal]=mixing(F,n,X_end,tol,kGlobal,maxIteration,lmd_in);
     kGlobal=kGlobal+kLocal-1;
     Y = F(X_end);
     err=max(abs(Y));
@@ -30,8 +25,8 @@ else
 end
 x_old=X_end;
 
-function [X_end, kLocal]=mixing(F,n,x_old,tol,kGlobal,maxIteration)
-lmd = 0.9;
+function [X_end, kLocal]=mixing(F,n,x_old,tol,kGlobal,maxIteration,lmd_in)
+lmd = lmd_in;
 lk = lmd;
 found=0;
 nm=min(30,n);
@@ -44,7 +39,7 @@ while (err>tol && kLocal+kGlobal-1<=maxIteration)
     Y(:,kLocal) = F(X(:,kLocal));
     err=max(abs(Y(:,kLocal)));
     if kLocal>1
-        fprintf('adm iteration: %d, error: %.14e\n',kGlobal+kLocal-1,err);
+        fprintf('adm iteration: %d,n=%d, error: %.14e\n',kGlobal+kLocal-1,n,err);
     end
     
     if (err < tol)
@@ -55,7 +50,7 @@ while (err>tol && kLocal+kGlobal-1<=maxIteration)
         return;
     end
     
-    if (err > 1e20)
+    if (err > 1000)
         explode=1
     end
     % Calculate the matrix U and the column vector v
@@ -71,18 +66,19 @@ while (err>tol && kLocal+kGlobal-1<=maxIteration)
             U(i,j) =dot(Y(:,kLocal) - Y(:,kLocal-i),Y(:,kLocal) - Y(:,kLocal-j));
         end
     end
-    
-    if rcond(U)<1e-10
-        fprintf("And_chen: Singular Matrix detected And_chen restarted!\n");
+      
+        % Calculate c = U^(-1) * v using LU decomposition
+    if (m > 0)
+        [U, o, err] = Doolittle (U, 1e-10);
+        if ~err
+            [c] = Doolsub (U, V, o, m);     % c is a row vector
+        else
+            fprintf("And_chen: Singular Matrix detected And_chen restarted!\n");
         X_end=X(:,kLocal);
         return;
+        end
     end
     
-    if kLocal==1
-        c=0;
-    else
-        c=U\V;
-    end
     
     % Calculate the next x^(k)
     for i = 1:n

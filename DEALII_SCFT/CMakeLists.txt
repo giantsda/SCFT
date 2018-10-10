@@ -59,7 +59,7 @@ SET(CLEAN_UP_FILES *.o scft *.vtk solution_store.txt solution_yita_1D*.txt *.msh
  
 DEAL_II_INVOKE_AUTOPILOT()
 
-TARGET_LINK_LIBRARIES(scft  libNR_CPP.so mylib)
+TARGET_LINK_LIBRARIES(scft   mylib libNR_CPP.so)
  
 
 
