@@ -1,7 +1,8 @@
 % x,y is the table waitting to be interpolated.
 % xp is the x vector you want to know yp at.
+% if not spcify m, use not-a-knot end condition
 % m=0 for natural spline;otherwise m is the ddy at boundarys
-function yp=spline_chen(x,y,xp)
+function yp=spline_chen(x,y,xp,m)
 Nx=length(x);
 Nxp=length(xp);
 A=zeros(Nx);
@@ -11,18 +12,25 @@ for i=2:Nx-1
     b(i)=(y(i+1)-y(i))/(x(i+1)-x(i))-(y(i)-y(i-1))/(x(i)-x(i-1));
 end
 
-% A(1,1)=1;
-% A(Nx,Nx)=1;
-% % A(1,2)=-1*m;
-% % A(Nx-1,Nx)=-1*m;
-% b(1)=m;
-% b(end)=m;
+%% not-a-knot end condition
+if (nargin==3)
+    A(1,1:3)=[1/(x(2)-x(1)) -1/(x(2)-x(1))-1/(x(3)-x(2)) 1/(x(3)-x(2))];
+    A(Nx,Nx-2:Nx)=[1/(x(Nx-1)-x(Nx-2)) -1/(x(Nx-1)-x(Nx-2))-1/(x(Nx)-x(Nx-1)) 1/(x(Nx)-x(Nx-1))];
+    b(1)=0;
+    b(Nx)=0;
+elseif (nargin==4)
+    A(1,1)=1;
+    A(Nx,Nx)=1;
+    % A(1,2)=-1*m;
+    % A(Nx-1,Nx)=-1*m;
+    b(1)=m;
+    b(end)=m;
+else
+    error('spline_chen: Too many input args!\n');
+end
 
-%% not a knot end condition
-A(1,1:3)=[1/(x(2)-x(1))^2 1/(x(2)-x(1))^2-1/(x(3)-x(2))^2 -1/(x(3)-x(2))^2];
-A(Nx,Nx-2:Nx)=[1/(x(Nx-1)-x(Nx-2))^2 1/(x(Nx-1)-x(Nx-2))^2-1/(x(Nx)-x(Nx-1))^2 -1/(x(Nx)-x(Nx-1))^2];
-b(1)=2*(y(2)-y(1))/(x(2)-x(1))^3-2*(y(3)-y(2))/(x(3)-x(2))^3;
-b(Nx)=2*((y(Nx-1)-y(Nx-2))/(x(Nx-1)-x(Nx-2))^3-(y(Nx)-y(Nx-1))/(x(Nx)-x(Nx-1))^3);
+
+
 
 
 

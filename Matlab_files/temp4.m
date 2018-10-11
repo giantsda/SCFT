@@ -10,7 +10,7 @@ close all;
 x=solutionyita1DN59(2:end-1,2);
 y=solutionyita1DN59(2:end-1,3);
 xp=linspace(0,3.7237,50000);
-yp=spline_chen([0 1 3 2],[0 0 2 2],[1]);
+% yp=spline_chen([0 1 3 2],[0 0 2 2],[1]);
 yp=spline_chen(x,y,xp);
 ypm = interp1(x,y,xp,'spline');
 plot(xp,yp,xp,ypm);
