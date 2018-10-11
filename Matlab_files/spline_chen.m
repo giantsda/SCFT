@@ -19,12 +19,12 @@ if (nargin==3)
     b(1)=0;
     b(Nx)=0;
 elseif (nargin==4)
-    A(1,1)=1;
+    A(1,1)=1;   
     A(Nx,Nx)=1;
     % A(1,2)=-1*m;
     % A(Nx-1,Nx)=-1*m;
     b(1)=m;
-    b(end)=m;
+    b(Nx)=m;
 else
     error('spline_chen: Too many input args!\n');
 end

@@ -43,4 +43,8 @@ adm_chen (void
 (*f) (int, double*, double*),
 	  double* x_old, double tol, int maxIteration, int n);
 
+void
+spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
+	     int flag, double m);
+
 #endif /* NR_CHEN_H_ */
