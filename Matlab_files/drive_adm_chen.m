@@ -2,10 +2,8 @@
 function drive_adm_chen
 x_old=[1;2;3];
 % [x_old, found] = AndMix (@myfun, x_old, 0.000001, 50000, 3)
-x_old=adm_chen (@myfun, 3, x_old, 1e-12, 50000);
- 
- 
-
+x_old=adm_chen (@myfun, 3, x_old, 1e-12, 50000,0.99,30);
+  
 
 function out=myfun(in)
 x=in(1);

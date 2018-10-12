@@ -40,7 +40,7 @@
 #include <fstream>
 #include <vector>
 
-#define BROYDN
+//#define BROYDN
 
 int de; // My debug varaibe
 
@@ -295,12 +295,12 @@ main ()
 
       for (int i = 0; i < 10; i++)
 	{
-//	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 3000, N - 2);
-	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 3000, N - 2,0.99,2);
+//	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
 	  heat_equation_solver.print_and_save_yita_1D (x_old);
 	  heat_equation_solver.output_results_for_yita_full_2D ();
 	  heat_equation_solver.output_mesh ();
-	  heat_equation_solver.refine_mesh (interpolated_solution_yita_1D);
+	  heat_equation_solver.refine_mesh (x_old,interpolated_solution_yita_1D);
 	  N = heat_equation_solver.get_N ();
 #ifdef BROYDN
 	  free_dmatrix (qt, 1, N - 2, 1, N - 2);

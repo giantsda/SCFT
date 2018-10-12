@@ -1,11 +1,9 @@
 function read_input(filename)
 global info;
 fprintf('reading %s...\n',filename);
-data=[];
 fid = fopen(filename,'r');
 if( fid==-1 )
     error('Can''t open the file.');
-    return;
 end
 str = fgets(fid);
 N = sscanf(str,'%*s %d', 1);

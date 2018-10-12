@@ -14,7 +14,7 @@ set_f0_given(tau,L);
 N=info.N;
 yita_middle_1D=info.yita_middle_1D;
 % [x_old, found] = broyden_wq(@simple_FEM_1D_transient, yita_middle_1D,0.00001, 1e-7, 20000, N-2);
-x_old=adm_chen (@simple_FEM_1D_transient,N-2,yita_middle_1D, 1e-7, 50000,0.99);
+x_old=adm_chen (@simple_FEM_1D_transient,N-2,yita_middle_1D, 1e-7, 50000,0.9,10);
 
 
 for i=1:10
@@ -23,7 +23,11 @@ for i=1:10
     info.yita_middle_1D=yita_middle_1D;
     set_f0_given(tau,L);
 %     [x_old, found] = broyden_wq(@simple_FEM_1D_transient, yita_middle_1D,0.00001, 1e-7, 20000, N-2);
-    x_old=adm_chen (@simple_FEM_1D_transient,N-2,yita_middle_1D, 1e-7, 50000,0.59);
+    yita_middle_1D=adm_chen (@simple_FEM_1D_transient,N-2,yita_middle_1D, 1e-2, 50000,0.999,3);
+    yita_middle_1D=adm_chen (@simple_FEM_1D_transient,N-2,yita_middle_1D, 1e-3, 50000,0.9,3);
+    yita_middle_1D=adm_chen (@simple_FEM_1D_transient,N-2,yita_middle_1D, 1e-4, 50000,0.9,4);
+    yita_middle_1D=adm_chen (@simple_FEM_1D_transient,N-2,yita_middle_1D, 1e-5, 50000,0.9,5);
+    x_old=adm_chen (@simple_FEM_1D_transient,N-2,yita_middle_1D, 1e-7, 50000,0.9,30);
 end
 
  

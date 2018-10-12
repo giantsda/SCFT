@@ -1,4 +1,4 @@
-function [x_old,found] = adm_chen (F, n, x_old, tol, maxIteration,lmd_in)
+function [x_old,found] = adm_chen (F, n, x_old, tol, maxIteration,lmd_in,m_in)
 found=0;
 kGlobal = 0;
 X_end = x_old;
@@ -7,12 +7,12 @@ Y = F(X_end);
 err=max(abs(Y));
 fprintf("adm_chen:n=%d Before solving, error=%2.15f \n",n,err);
 % if err>1
-    fprintf("adm_chen: Before solving, error>1 Continue? \n");
-    pause();
+fprintf("adm_chen: Before solving, error>1 Continue? \n");
+pause();
 % end
 
 while (err>tol && kGlobal<=maxIteration)
-    [X_end, kLocal]=mixing(F,n,X_end,tol,kGlobal,maxIteration,lmd_in);
+    [X_end, kLocal]=mixing(F,n,X_end,tol,kGlobal,maxIteration,lmd_in,m_in);
     kGlobal=kGlobal+kLocal-1;
     Y = F(X_end);
     err=max(abs(Y));
@@ -25,11 +25,12 @@ else
 end
 x_old=X_end;
 
-function [X_end, kLocal]=mixing(F,n,x_old,tol,kGlobal,maxIteration,lmd_in)
+function [X_end, kLocal]=mixing(F,n,x_old,tol,kGlobal,maxIteration,lmd_in,m_in)
 lmd = lmd_in;
 lk = lmd;
-found=0;
-nm=min(30,n);
+% found=0;
+% nm=min(30,n);
+nm=m_in;
 kLocal = 1;
 X(:,kLocal) = x_old;
 err=Inf;
@@ -50,9 +51,10 @@ while (err>tol && kLocal+kGlobal-1<=maxIteration)
         return;
     end
     
-    if (err > 1000)
+    if (err > 1e7)
         explode=1
     end
+    
     % Calculate the matrix U and the column vector v
     if (kLocal-1 <= nm)
         m = kLocal-1;
@@ -66,18 +68,31 @@ while (err>tol && kLocal+kGlobal-1<=maxIteration)
             U(i,j) =dot(Y(:,kLocal) - Y(:,kLocal-i),Y(:,kLocal) - Y(:,kLocal-j));
         end
     end
-      
-        % Calculate c = U^(-1) * v using LU decomposition
+    
+    
+%     Calculate c = U^(-1) * v using Gauss
     if (m > 0)
-        [U, o, err] = Doolittle (U, 1e-10);
-        if ~err
-            [c] = Doolsub (U, V, o, m);     % c is a row vector
-        else
+        [c, err2] = gauss (U, V, 1e-16);
+        if (err2)
             fprintf("And_chen: Singular Matrix detected And_chen restarted!\n");
-        X_end=X(:,kLocal);
-        return;
+            X_end=X(:,kLocal);
+            return;
         end
     end
+ 
+    
+    
+%     % Calculate c = U^(-1) * v using LU decomposition
+%     if (m > 0)
+%         [U, o, err2] = Doolittle (U, 1e-14);
+%         if ~err2
+%             [c] = Doolsub (U, V, o, m);     % c is a row vector
+%         else
+%             fprintf("And_chen: Singular Matrix detected And_chen restarted!\n");
+%             X_end=X(:,kLocal);
+%             return;
+%         end
+%     end
     
     
     % Calculate the next x^(k)

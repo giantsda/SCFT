@@ -21,30 +21,20 @@ struct parameterDumper
   char* s1, *s2, *s3, *s4, *s5;
 };
 
-inline double **
-Matcreate (int r, int c) // The elements in the rows are next to each other.
-{
-  double** A = (double **) malloc (sizeof(double *) * r);
-  A[0] = (double *) malloc (sizeof(double) * c * r);
-  for (int i = 0; i < r; i++)
-    A[i] = (*A + c * i);
-  return A;
-}
+double **
+Matcreate (int r, int c); // The elements in the rows are next to each other.
 
-inline void
-Matfree (double** A)
-{
-  free (A[0]);
-  free (A);
-}
+void
+Matfree (double** A);
 
 int
 adm_chen (void
-(*f) (int, double*, double*),
-	  double* x_old, double tol, int maxIteration, int n);
+(*f) (int, double* in, double* out),
+	  double* x_old, double tol, int maxIteration, int n, double lmd,
+	  int nn);
 
 void
 spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
-	     int flag, double m);
+	     double* m);
 
 #endif /* NR_CHEN_H_ */

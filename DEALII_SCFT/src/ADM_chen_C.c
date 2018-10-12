@@ -17,11 +17,14 @@
 
 int
 adm_chen (void
-(*f) (int, double*, double*),
-	  double* x_old, double tol, int maxIteration, int n)
+(*f) (int, double* in, double* out),
+	  double* x_old, double tol, int maxIteration, int n,double lmd, int nn)
 /* It solves a function of type: void f (double* in, double* out, int n, struct parameterDumper* p) p is for some parameters you would like to pass
  * so that global variables can be avoided!
  * x_old is the initial guess; tol is the tolerance; maxIteration is the max iteration number you allowed.
+ * lmd is the relaxzation factor
+ * nn is the max size of matrix U
+ *
  * How to use it:
  * to solve myfun:
  *
@@ -29,22 +32,21 @@ adm_chen (void
  *   struct parameterDumper p;
  *   p.double_a = 2.5;
  *   p.double_b = 3.6;
- *   int fail = adm_chen (&myfun, x, 1e-15, 3000, 3, &p);
+ *   int fail = adm_chen (&myfun, x, 1e-15, 3000, 3,0.99,30);
  */
 
 {
   // n is the size of the vector problem
   int k = 0; // kth iteration
-  double lmd = 0.99; // relaxzation factor
   double lk = lmd;
   int m;
-  int nm = DMIN(30, n);
+  int nm = DMIN(nn, n);
   double** U = dmatrix (1, nm, 1, nm);
   double** V = dmatrix (1, nm, 1, 1);
   int k_restart = 0; // k_restart is used when U is ill.
   double err = 9.9e99; // err
-  double** X = Matcreate (maxIteration, maxIteration);
-  double** Y = Matcreate (maxIteration, maxIteration); /* X is used to store the guessed solution and
+  double** X = Matcreate (maxIteration, n);
+  double** Y = Matcreate (maxIteration, n); /* X is used to store the guessed solution and
    Y is the resulted rhs*/
   for (int i = 0; i < n; i++)
     X[0][i] = x_old[i];

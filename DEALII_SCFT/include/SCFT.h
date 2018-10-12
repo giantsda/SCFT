@@ -70,7 +70,7 @@ namespace SCFT
       int
       get_local_iteration () const;
       void
-      refine_mesh (std::vector<double> & in);
+      refine_mesh (std::vector<double> oldSolution, std::vector<double> & newSolution);
       void
       update_internal_data ();
       double *

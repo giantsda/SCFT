@@ -11,12 +11,13 @@
 
 void
 spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
-	     int flag, double m)
-/* x,y is the table waitting to be interpolated.
+	     double* m)
+/* x,y is the table waiting to be interpolated.
  x from [0 Nx];
  xp is the x vector you want to know yp at.
- if not spcify m, use not-a-knot end condition
- m=0 for natural spline;otherwise m is the ddy at boundarys
+ is m==NULL use not-a-knot end condition
+ m=0 for natural spline;
+ otherwise m is the ddy at boundarys
  */
 {
   double** A = dmatrix (1, Nx, 1, Nx); // NR requires it 1 based.
@@ -39,7 +40,7 @@ spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
 	  - (y[i - 1] - y[i - 2]) / (x[i - 1] - x[i - 2]);
     }
 
-  if (flag == 0) // use not-a-knot
+  if (m == NULL) // use not-a-knot
     {
       A[1][1] = 1 / (x[1] - x[0]);
       A[1][2] = -1 / (x[1] - x[0]) - 1 / (x[2] - x[1]);
@@ -49,18 +50,12 @@ spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
 	  - 1 / (x[Nx - 1] - x[Nx - 2]);
       A[Nx][Nx] = 1 / (x[Nx - 1] - x[Nx - 2]);
     }
-  else if (flag == 1)
+  else
     {
       A[1][1] = 1.;
       A[Nx][Nx] = 1.;
-      B[1][1] = m;
-      B[Nx][1] = m;
-    }
-  else
-    {
-      printf (
-	  "spline_chen:ERROR: flag should be 0(use not-a-knot) or 1(specify ddy and end)\n");
-      exit (-1);
+      B[1][1] = *m;
+      B[Nx][1] = *m;
     }
 
   int fail = 0;
@@ -81,12 +76,15 @@ spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
 	    klo = k;
 	}
       h = x[khi] - x[klo];
-//      if (h == 0.0)
-//	nrerror ("Bad xa input to routine splint");
-	a = (x[khi] - xp[i]) / h;
+      if (h == 0.0)
+	{
+	  printf ("spline_chen:ERROR! Bad x input x should be increasing\n");
+	  exit (-1);
+	}
+      a = (x[khi] - xp[i]) / h;
       b = (xp[i] - x[klo]) / h;
       yp[i] = a * y[klo] + b * y[khi]
-	  + ((a * a * a - a) * B[klo+1][1] + (b * b * b - b) * B[khi+1][1])
+	  + ((a * a * a - a) * B[klo + 1][1] + (b * b * b - b) * B[khi + 1][1])
 	      * (h * h) / 6.0;
 
     }

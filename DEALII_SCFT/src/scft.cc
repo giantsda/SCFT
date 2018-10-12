@@ -124,7 +124,7 @@ namespace SCFT
 
   template<int dim>
     void
-    HeatEquation<dim>::refine_mesh (std::vector<double> & in)
+    HeatEquation<dim>::refine_mesh (std::vector<double> oldSolution, std::vector<double> & newSolution)
     {
 #undef float
       Vector<float> estimated_error_per_cell (triangulation.n_active_cells ());
@@ -138,7 +138,6 @@ namespace SCFT
 					  typename FunctionMap<dim>::type (),
 					  yita_full_2D_t,
 					  estimated_error_per_cell);
-
 #define float double
 
       //      GridRefinement::refine_and_coarsen_fixed_fraction (
@@ -153,19 +152,16 @@ namespace SCFT
 	  if (cell->refine_flag_set ())
 	    cell->set_refine_flag (RefinementCase<dim>::cut_axis (0));
 	}
-      SolutionTransfer<dim> solution_trans (dof_handler);
-      Vector<double> previous_solution, new_solution;
-      previous_solution = yita_full_2D_t;
-      //      triangulation.prepare_coarsening_and_refinement ();
-      solution_trans.prepare_for_coarsening_and_refinement (previous_solution);
+
+
+      std::vector<double> x,xp;
+      get_x(x);
       triangulation.execute_coarsening_and_refinement ();
       setup_system ();
-      new_solution.reinit (dof_handler.n_dofs ());
-      solution_trans.interpolate (previous_solution, new_solution);
+      get_x(xp);
+      newSolution.resize (N);
+      spline_chen(&x[1],&oldSolution[1],&xp[1],&newSolution[1],x.size()-2,xp.size()-2,NULL);
 
-      in.resize (get_N ());
-      for (unsigned int i = 0; i < in.size (); i++)
-	in[i] = new_solution[solution_table_1D_to_2D.find (i)->second];
       refine_times++;
     }
 
