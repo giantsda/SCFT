@@ -26,12 +26,11 @@ for cell=1:N-1;
     end
 end
 mesh_new=[mesh_new node(end)];
-info.mesh=mesh_new; 
+info.mesh=mesh_new;
 info.N=length(mesh_new);
-%% interpolate new solution; 
+%% interpolate new solution;
 % plot(node(2:end-1), x_old  ,'*-');
 % hold on;
-new_solution = interp1(node(2:end-1),x_old,mesh_new(2:end-1),'spline');
-new_solution=new_solution.';
-% plot( mesh_new(2:end-1),new_solution, ':.');
-
+% new_solution = interp1(node(2:end-1),x_old,mesh_new(2:end-1),'spline');
+new_solution=spline_chen(node(2:end-1),x_old,mesh_new(2:end-1),10);
+ 
