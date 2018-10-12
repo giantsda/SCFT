@@ -32,5 +32,5 @@ info.N=length(mesh_new);
 % plot(node(2:end-1), x_old  ,'*-');
 % hold on;
 % new_solution = interp1(node(2:end-1),x_old,mesh_new(2:end-1),'spline');
-new_solution=spline_chen(node(2:end-1),x_old,mesh_new(2:end-1),10);
+new_solution=spline_chen(node(2:end-1),x_old,mesh_new(2:end-1));
  
