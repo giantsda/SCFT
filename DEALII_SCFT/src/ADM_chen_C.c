@@ -18,7 +18,8 @@
 int
 adm_chen (void
 (*f) (int, double* in, double* out),
-	  double* x_old, double tol, int maxIteration, int n,double lmd, int nn)
+	  double* x_old, double tol, int maxIteration, int n, double lmd,
+	  int nn)
 /* It solves a function of type: void f (double* in, double* out, int n, struct parameterDumper* p) p is for some parameters you would like to pass
  * so that global variables can be avoided!
  * x_old is the initial guess; tol is the tolerance; maxIteration is the max iteration number you allowed.
@@ -45,8 +46,8 @@ adm_chen (void
   double** V = dmatrix (1, nm, 1, 1);
   int k_restart = 0; // k_restart is used when U is ill.
   double err = 9.9e99; // err
-  double** X = Matcreate (maxIteration, n);
-  double** Y = Matcreate (maxIteration, n); /* X is used to store the guessed solution and
+  double** X = Matcreate (maxIteration + 2, n);
+  double** Y = Matcreate (maxIteration + 2, n); /* X is used to store the guessed solution and
    Y is the resulted rhs*/
   for (int i = 0; i < n; i++)
     X[0][i] = x_old[i];
@@ -60,7 +61,7 @@ adm_chen (void
 	  if (fabs (Y[k][i]) >= err)
 	    err = fabs (Y[k][i]);
 	}
-      printf ("And_chen: iter=%d; err=%2.15E\n", k, err);
+      printf ("And_chen:iter=%d;N=%d,lk=%e,err=%2.4E\n", k, n, lk, err);
       if (err < tol)
 	{
 	  for (int i = 0; i < n; i++)
@@ -114,14 +115,21 @@ adm_chen (void
 	    }
 	  X[k + 1][i] = X[k][i] + cx + (1 - lk) * (Y[k][i] + cd);
 	}
-      lk *= lmd;
+
+      if (err < 0.03 && k > 100) // only modifiy lk if it is close to solution
+	lk *= lmd;
+
+      if (lk < 1e-5)  // reset lk if it is too small
+	lk = lmd;
+
       k++;
     }
 
   printf (
       "And_chen failed after %d iterations :(  Try to increase max iteration allowed\n",
       maxIteration);
-
+  for (int i = 0; i < n; i++)
+    x_old[i] = X[k][i];
   free_dmatrix (U, 1, nm, 1, nm);
   free_dmatrix (V, 1, nm, 1, 1);
   Matfree (X);

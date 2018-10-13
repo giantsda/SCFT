@@ -106,8 +106,8 @@ template<int dim>
 	// Next time, it is setup in the refine();
 	refine_times++;
       }
-    std::cout << "Number of active cells: " << triangulation.n_active_cells ()
-	<< std::endl;
+//    std::cout << "Number of active cells: " << triangulation.n_active_cells ()
+//	<< std::endl;
 
     VectorTools::interpolate (dof_handler, Initial_condition<dim> (), Xn);
     Xnp1 = Xn;
@@ -240,12 +240,12 @@ SCFT_wrapper (int N, double * in, double * out)
   out[i] = res[i];
 #endif
   int local_interation = heat_equation_solver.get_local_iteration ();
-  for (int i = 0; i < N; i++)
-    printf (
-	"in[%d]=%2.15f ; out[%d]=%2.15f ; local_iteration:%d refine_times:%d \n",
-	i, in[i], i, out[i], local_interation,
-	heat_equation_solver.get_refine_times ());
-  fflush (stdout);
+//  for (int i = 0; i < N; i++)
+//    printf (
+//	"in[%d]=%2.15f ; out[%d]=%2.15f ; local_iteration:%d refine_times:%d \n",
+//	i, in[i], i, out[i], local_interation,
+//	heat_equation_solver.get_refine_times ());
+//  fflush (stdout);
   heat_equation_solver.set_local_iteration (local_interation + 1);
 }
 
@@ -295,7 +295,10 @@ main ()
 
       for (int i = 0; i < 10; i++)
 	{
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 3000, N - 2,0.99,2);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-1, 200, N - 2,0.99,2);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-4, 400, N - 2,0.9,5);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 800, N - 2,0.9,15);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2,0.9,30);
 //	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
 	  heat_equation_solver.print_and_save_yita_1D (x_old);
 	  heat_equation_solver.output_results_for_yita_full_2D ();
