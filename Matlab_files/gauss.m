@@ -40,6 +40,6 @@ if ~err
     end
 end
 
-if ~err     % Back substitution
+% if ~err     % Back substitution
     [x] = backsub (A, b, o, n);
-end
+% end
