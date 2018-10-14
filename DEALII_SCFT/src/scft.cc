@@ -383,6 +383,7 @@ namespace SCFT
       system_matrix.add (time_step, B);
       system_matrix.add (time_step, C);
 
+      inverse_mass_matrix.initialize(A);
     }
 
   template<int dim>

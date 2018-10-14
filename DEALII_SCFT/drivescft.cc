@@ -45,6 +45,7 @@
 int de; // My debug varaibe
 
 SCFT::HeatEquation<2> heat_equation_solver;
+
 namespace dealii
 {
   template<int dim>
@@ -127,52 +128,14 @@ template<int dim>
 					      boundary_values_r);
     MatrixTools::apply_boundary_values (boundary_values_r, system_matrix, Xnp1,
 					system_rhs);
-    time = 0.;
-    for (timestep_number = 1; timestep_number < total_time_step;
-	timestep_number++)
-      {
-	time += time_step;
-	A.vmult (system_rhs, Xn);
 
-	// Manually apply BC;
-	for (auto itr = boundary_values_l.begin ();
-	    itr != boundary_values_l.end (); ++itr)
-	  {
-	    system_rhs[itr->first] = itr->second;
-	  }
-	for (auto itr = boundary_values_r.begin ();
-	    itr != boundary_values_r.end (); ++itr)
-	  {
-	    system_rhs[itr->first] = itr->second;
-	  }
+    unsigned int n_steps = 0;
+    const unsigned int n_time_steps = 2049;
+    const double initial_time = 0.;
+    const double final_time = 1.;
 
-	solve_time_step ();
-
-	Xn = Xnp1;
-	solution_store[0][timestep_number] = time;
-	for (int i = 0; i < N; i++)
-	  {
-	    solution_store[i + 1][timestep_number] =
-		Xnp1[solution_table_1D_to_2D.find (i)->second];
-	  }
-
-      }
-
-//       write solution;
-
-//      {
-//	FILE * fp;
-//	fp = fopen ("solution_store.txt", "w+");
-//	for (int i = 0; i < N + 1; i++)
-//	  {
-//	    for (int j = 0; j < total_time_step; j++)
-//	      fprintf (fp, "%2.15f,", solution_store[i][j]);
-//	    fprintf (fp, "\n");
-//	  }
-//
-//	fclose (fp);
-//      }
-//      scanf ("%d", &de);
+    n_steps = embedded_explicit_method (TimeStepping::DOPRI, n_time_steps,
+					initial_time, final_time);
 
     /*   integrate for f0 use romint   */
     double v_for_romint[total_time_step];
@@ -194,6 +157,84 @@ template<int dim>
 	out[i] = f0_given[i] - f0[i];// +yita_full_1D[i];  // for adm // so f0 and f0_given are full sized and so out is full sized.
       }
     return &out[1];
+  }
+
+template<int dim>
+  unsigned int
+  SCFT::HeatEquation<dim>::embedded_explicit_method (
+      const TimeStepping::runge_kutta_method method,
+      const unsigned int n_time_steps, const double initial_time,
+      const double final_time)
+  {
+    double time_step = (final_time - initial_time)
+	/ static_cast<double> (n_time_steps);
+    double time = initial_time;
+    const double coarsen_param = 1.2;
+    const double refine_param = 0.8;
+    const double min_delta = 1e-8;
+    const double max_delta = 100 * time_step;
+    const double refine_tol = 1e-1;
+    const double coarsen_tol = 1e-5;
+
+    TimeStepping::EmbeddedExplicitRungeKutta<Vector<double> > embedded_explicit_runge_kutta (
+	method, coarsen_param, refine_param, min_delta, max_delta, refine_tol,
+	coarsen_tol);
+
+    Vector<double> X_1D (N);
+
+    unsigned int n_steps = 0;
+    while (time < final_time)
+      {
+	if (time + time_step > final_time)
+	  time_step = final_time - time;
+
+	printf ("time=%f:Before solving, X=:\n\n", time);
+	for (int i = 0; i < N; i++)
+	  X_1D[i] = Xnp1[solution_table_1D_to_2D.find (i)->second];
+
+	X_1D.print (std::cout);
+	time = embedded_explicit_runge_kutta.evolve_one_time_step (
+	    std::bind (&HeatEquation<dim>::evaluate_diffusion, this,
+		       std::placeholders::_1, std::placeholders::_2),
+	    time, time_step, Xnp1);
+
+	printf ("time=%f:After solving, X=:\n\n", time);
+	for (int i = 0; i < N; i++)
+	  X_1D[i] = Xnp1[solution_table_1D_to_2D.find (i)->second];
+
+	X_1D.print (std::cout);
+
+	scanf ("%d", &de);
+
+	time_step = embedded_explicit_runge_kutta.get_status ().delta_t_guess;
+	++n_steps;
+      }
+
+    return n_steps;
+  }
+
+template<int dim>
+  dealii::Vector<double>
+  SCFT::HeatEquation<dim>::evaluate_diffusion (const double time,
+					       const Vector<double> &y) const // evaluate inv(A)*(-B*y-C*y)
+  {
+    Vector<double> tmp1 (dof_handler.n_dofs ());
+    tmp1 = 0.;
+    Vector<double> tmp2 (dof_handler.n_dofs ());
+    tmp2 = 0.;
+
+    const double factor = -1.;
+
+    B.vmult (tmp1, y);
+    C.vmult (tmp2, y);
+    tmp1 *= -1.;
+    tmp1 -= tmp2;
+
+    Vector<double> value (dof_handler.n_dofs ());
+
+    inverse_mass_matrix.vmult (value, tmp1);
+
+    return value;
   }
 
 void
@@ -252,11 +293,15 @@ main ()
       HeatEquation<2> other (tau, N, 2049, L); /* 2049 are points, 2048 intervals */
       heat_equation_solver = other; // I need this global class to do stuffs
       std::vector<double> interpolated_solution_yita_1D;
-//      double* out=heat_equation_solver.run (&x_old[0]);
 
-//      for(int i=0;i<N;i++)
-//	printf("out[%d]=%2.15f\n",i,out[i]);
-//      /*--------------------------------------------------------------*/
+      x_old.resize (N, 0.);
+      double* out = heat_equation_solver.run (&x_old[0]);
+
+      for (int i = 0; i < N; i++)
+	printf ("out[%d]=%2.15f\n", i, out[i]);
+      /*--------------------------------------------------------------*/
+
+      return 0;
 
 #ifdef BROYDN
       int check = 1;

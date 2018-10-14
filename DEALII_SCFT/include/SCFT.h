@@ -40,6 +40,9 @@
 #include "NR_chen.h"
 #include <vector>
 
+#include <deal.II/base/time_stepping.h>
+#include <deal.II/lac/sparse_direct.h>
+
 namespace SCFT
 {
 
@@ -86,6 +89,15 @@ namespace SCFT
       output_mesh ();
       void
       print_and_save_yita_1D (std::vector<double> solution);
+      unsigned int
+      embedded_explicit_method (const TimeStepping::runge_kutta_method method,
+				const unsigned int n_time_steps,
+				const double initial_time,
+				const double final_time);
+
+      Vector<double>
+      evaluate_diffusion (const double time, const Vector<double> &y) const;
+
     private:
       void
       setup_system ();
@@ -136,6 +148,7 @@ namespace SCFT
       std::map<int, int> solution_table_2D_to_1D;
       std::map<double, int> solution_table_x_to_2D;
       std::map<int, double> solution_table_2D_to_x;
+      SparseDirectUMFPACK          inverse_mass_matrix;
     };
 
 }
