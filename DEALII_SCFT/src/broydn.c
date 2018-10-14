@@ -122,7 +122,7 @@ broydn (float x[], int n, int *check, void
 	  if (sing)
 	    {
 	      printf ("It is singlular \n ");
-	      scanf ("%d", &de);
+//	      scanf ("%d", &de);
 	    }
 	  if (sing)
 	    nrerror ("singular Jacobian in broydn");

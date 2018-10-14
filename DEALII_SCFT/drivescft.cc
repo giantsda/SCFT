@@ -78,9 +78,8 @@ template<int dim>
   double *
   SCFT::HeatEquation<dim>::run (double* yita_middle_1D_in)
   {
-    std::vector<double> yita_full_1D (N, 0.);
-    for (int i = 0; i < N - 2; i++)
-      yita_full_1D[i + 1] = yita_middle_1D_in[i];
+    yita_middle_1D = yita_middle_1D_in; //set yita_middle_1D
+
     if (refine_times == 0)
       {
 	if (1)
@@ -106,35 +105,10 @@ template<int dim>
 	// Next time, it is setup in the refine();
 	refine_times++;
       }
-//    std::cout << "Number of active cells: " << triangulation.n_active_cells ()
-//	<< std::endl;
+    assemble_system ();
 
     VectorTools::interpolate (dof_handler, Initial_condition<dim> (), Xn);
     Xnp1 = Xn;
-
-    // convert yita_full_1D to yita_full_2D;
-    for (int i = 0; i < 2 * N; i++)
-      {
-	int j = solution_table_2D_to_1D.find (i)->second;
-	yita_full_2D[i] = yita_full_1D[j];
-      }
-
-//      for (int i = 0; i < 2 * N; i++)
-//	printf ("yita_full_2D[%d]=%2.15f \n", i, yita_full_2D[i]);
-//      scanf ("%d", &de);
-
-    system_matrix.copy_from (A);
-    system_matrix.add (time_step, B);
-    C.copy_from (A);
-    for (unsigned int i = 0; i < C.m (); i++)
-      {
-	SparseMatrix<double>::iterator begin = C.begin (i), end = C.end (i);
-	for (; begin != end; ++begin)
-	  {
-	    begin->value () *= yita_full_2D[i];
-	  }
-      }
-    system_matrix.add (time_step, C);
 
     for (int i = 2; i < N; i++)
       solution_store[i][0] = 1.;
@@ -234,10 +208,10 @@ SCFT_wrapper (int N, double * in, double * out)
 
 #ifdef BROYDN
   for (int i = 0; i < N - 2; i++)
-    out[i + 1] = res[i];
+  out[i + 1] = res[i];
 #else
   for (int i = 0; i < N - 2; i++)
-  out[i] = res[i];
+    out[i] = res[i];
 #endif
   int local_interation = heat_equation_solver.get_local_iteration ();
 //  for (int i = 0; i < N; i++)
@@ -295,15 +269,16 @@ main ()
 
       for (int i = 0; i < 10; i++)
 	{
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-1, 200, N - 2,0.99,2);
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-4, 400, N - 2,0.9,5);
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 800, N - 2,0.9,15);
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2,0.9,30);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-1, 200, N - 2, 0.99, 2);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-4, 400, N - 2, 0.9, 5);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 800, N - 2, 0.9, 15);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.9, 30);
 //	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
 	  heat_equation_solver.print_and_save_yita_1D (x_old);
 	  heat_equation_solver.output_results_for_yita_full_2D ();
 	  heat_equation_solver.output_mesh ();
-	  heat_equation_solver.refine_mesh (x_old,interpolated_solution_yita_1D);
+	  heat_equation_solver.refine_mesh (x_old,
+					    interpolated_solution_yita_1D);
 	  N = heat_equation_solver.get_N ();
 #ifdef BROYDN
 	  free_dmatrix (qt, 1, N - 2, 1, N - 2);

@@ -60,6 +60,11 @@ spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
 
   int fail = 0;
   fail = gaussj (A, Nx, B, 1);
+  if (fail)
+    {
+      printf ("spline_chen:ERROR! gaussj cannot solve Ax=b\n");
+      exit (-1);
+    }
   int k;
   double h, a, b;
 

@@ -70,7 +70,8 @@ namespace SCFT
       int
       get_local_iteration () const;
       void
-      refine_mesh (std::vector<double> oldSolution, std::vector<double> & newSolution);
+      refine_mesh (std::vector<double> oldSolution,
+		   std::vector<double> & newSolution);
       void
       update_internal_data ();
       double *
@@ -88,6 +89,8 @@ namespace SCFT
     private:
       void
       setup_system ();
+      void
+      assemble_system ();
       void
       solve_time_step ();
       void
@@ -123,6 +126,7 @@ namespace SCFT
       double** solution_store;
       double L;
       Vector<double> f0;
+      double* yita_middle_1D;
       Vector<double> yita_full_1D;
       Vector<double> yita_full_2D;
       Vector<double> out;
