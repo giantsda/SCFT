@@ -284,7 +284,7 @@ namespace SCFT
 	  << std::endl << std::endl;
 
       DynamicSparsityPattern dsp (dof_handler.n_dofs ());
-      DoFTools::make_sparsity_pattern (dof_handler, dsp, constraints,
+      DoFTools::make_sparsity_pattern (dof_handler, dsp, constraint_matrix,
       /*keep_constrained_dofs = */true);
       sparsity_pattern.copy_from (dsp);
       A.reinit (sparsity_pattern);
@@ -309,6 +309,15 @@ namespace SCFT
       A = 0.;
       B = 0.;
       C = 0.;
+
+      VectorTools::interpolate_boundary_values (dof_handler, 0,
+						Functions::ZeroFunction<dim> (),
+						constraint_matrix);
+
+      VectorTools::interpolate_boundary_values (dof_handler, 1,
+						Functions::ZeroFunction<dim> (),
+						constraint_matrix);
+      constraint_matrix.close ();
 
 //      MatrixCreator::create_mass_matrix (dof_handler,
 //					 QGauss<dim> (fe.degree + 1), A);
@@ -349,17 +358,11 @@ namespace SCFT
 		}
 
 	  cell->get_dof_indices (local_dof_indices);
-	  cell->get_dof_indices (local_dof_indices);
-	  for (unsigned int i = 0; i < dofs_per_cell; ++i)
-	    {
-	      for (unsigned int j = 0; j < dofs_per_cell; ++j)
-		{
-		  A.add (local_dof_indices[i], local_dof_indices[j],
-			 cell_A (i, j));
-		  B.add (local_dof_indices[i], local_dof_indices[j],
-			 cell_B (i, j));
-		}
-	    }
+
+	  constraint_matrix.distribute_local_to_global (cell_A,
+							local_dof_indices, A);
+	  constraint_matrix.distribute_local_to_global (cell_B,
+							local_dof_indices, B);
 	}
 
       std::vector<double> yita_full_1D (N, 0.);
@@ -371,6 +374,9 @@ namespace SCFT
 	  yita_full_2D[i] = yita_full_1D[j];
 	}
       C.copy_from (A);
+      printf ("C:before yita\n");
+      C.print (std::cout);
+
       for (unsigned int i = 0; i < C.m (); i++)
 	{
 	  SparseMatrix<double>::iterator begin = C.begin (i), end = C.end (i);
@@ -379,11 +385,20 @@ namespace SCFT
 	      begin->value () *= yita_full_2D[i];
 	    }
 	}
+
+      printf ("C:after yita\n");
+      C.print (std::cout);
+
+      int de;
+      scanf ("%d", &de);
+
       system_matrix.copy_from (A);
       system_matrix.add (time_step, B);
       system_matrix.add (time_step, C);
 
-      inverse_mass_matrix.initialize(A);
+
+
+      inverse_mass_matrix.initialize (A);
     }
 
   template<int dim>

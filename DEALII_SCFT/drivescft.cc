@@ -137,6 +137,22 @@ template<int dim>
     n_steps = embedded_explicit_method (TimeStepping::DOPRI, n_time_steps,
 					initial_time, final_time);
 
+    //       write solution;
+
+      {
+	FILE * fp;
+	fp = fopen ("solution_store.txt", "w+");
+	for (int i = 0; i < N + 1; i++)
+	  {
+	    for (int j = 0; j < total_time_step; j++)
+	      fprintf (fp, "%2.15f,", solution_store[i][j]);
+	    fprintf (fp, "\n");
+	  }
+
+	fclose (fp);
+      }
+    scanf ("%d", &de);
+
     /*   integrate for f0 use romint   */
     double v_for_romint[total_time_step];
     for (int i = 0; i < N; i++)
@@ -172,7 +188,7 @@ template<int dim>
     const double coarsen_param = 1.2;
     const double refine_param = 0.8;
     const double min_delta = 1e-8;
-    const double max_delta = 100 * time_step;
+    const double max_delta = 1 * time_step;
     const double refine_tol = 1e-1;
     const double coarsen_tol = 1e-5;
 
@@ -206,8 +222,16 @@ template<int dim>
 
 	scanf ("%d", &de);
 
+	solution_store[0][timestep_number] = time;
+	for (int i = 0; i < N; i++)
+	  {
+	    solution_store[i + 1][timestep_number] =
+		Xnp1[solution_table_1D_to_2D.find (i)->second];
+	  }
+
 	time_step = embedded_explicit_runge_kutta.get_status ().delta_t_guess;
 	++n_steps;
+	timestep_number++;
       }
 
     return n_steps;
@@ -290,10 +314,12 @@ main ()
       std::vector<double> x_old; // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
       double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
       read_yita_middle_1D (x_old, "inputFiles/N=33_for_read.txt", N); // read data from file, also set N;
+      N = 33;
       HeatEquation<2> other (tau, N, 2049, L); /* 2049 are points, 2048 intervals */
       heat_equation_solver = other; // I need this global class to do stuffs
       std::vector<double> interpolated_solution_yita_1D;
 
+      x_old.clear ();
       x_old.resize (N, 0.);
       double* out = heat_equation_solver.run (&x_old[0]);
 

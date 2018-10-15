@@ -115,7 +115,7 @@ namespace SCFT
       Triangulation<dim> triangulation;
       FE_Q<dim> fe;
       DoFHandler<dim> dof_handler;
-      ConstraintMatrix constraints;
+      ConstraintMatrix constraint_matrix;
 
       SparsityPattern sparsity_pattern;
       SparseMatrix<double> A; // A: mass matrix (fi[i],fi[j])
