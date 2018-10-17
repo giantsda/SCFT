@@ -13,6 +13,7 @@ read_input(filename)
 set_f0_given(tau,L);
 N=info.N;
 yita_middle_1D=info.yita_middle_1D;
+% yita_middle_1D(:)=0;
 % [x_old, found] = broyden_wq(@simple_FEM_1D_transient, yita_middle_1D,0.00001, 1e-7, 20000, N-2);
 x_old=adm_chen (@simple_FEM_1D_transient,N-2,yita_middle_1D, 1e-7, 50000,0.9,10);
 
