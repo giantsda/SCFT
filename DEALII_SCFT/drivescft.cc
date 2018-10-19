@@ -77,57 +77,6 @@ namespace dealii
     }
 }
 
-namespace SCFT
-{
-  class SCFTsolve : public Subscriptor
-  {
-  public:
-    SCFTsolve (const BlockSparseMatrix<double> &A);
-    void
-    vmult (Vector<double> &dst, const Vector<double> &src) const;
-  private:
-    const SmartPointer<const BlockSparseMatrix<double> > system_matrix;
-    mutable Vector<double> srcUp, srcLow, resUp, resLow;
-  };
-
-  SCFTsolve::SCFTsolve (const BlockSparseMatrix<double> &A) :
-      system_matrix (&A), srcUp (A.block (0, 0).m ()), srcLow (
-	  A.block (0, 0).m ()), resUp (A.block (0, 0).m ()), resLow (
-	  A.block (0, 0).m ())
-  {
-  }
-
-  void
-  SCFTsolve::vmult (Vector<double> &dst, const Vector<double> &src) const
-  {
-    int n_dof = src.size () / 2;
-    for (int i = 0; i < n_dof; i++)
-      {
-	srcUp[i] = src[i];
-	srcLow[i] = src[i + n_dof];
-      }
-    Vector<double> tmp1, tmp2;
-    tmp1.reinit (n_dof);
-    tmp2.reinit (n_dof);
-
-    system_matrix->block (0, 0).vmult (tmp1, srcUp);
-    system_matrix->block (0, 1).vmult (tmp2, srcLow);
-    resUp = tmp1;
-    resUp += tmp2;
-    system_matrix->block (1, 0).vmult (tmp1, srcUp);
-    system_matrix->block (1, 1).vmult (tmp2, srcLow);
-    resLow = tmp1;
-    resLow += tmp2;
-
-    for (int i = 0; i < n_dof; i++)
-      {
-	dst[i] = resUp[i];
-	dst[i + n_dof] = resLow[i];
-      }
-  }
-
-}
-
 template<int dim>
   double *
   SCFT::HeatEquation<dim>::run (double* yita_middle_1D_in)
@@ -169,150 +118,24 @@ template<int dim>
     solution_store[0][0] = 0.;
     solution_store[N][0] = 0.;
 
-    FESystem<dim> fe_s (FE_Q<dim> (1), 1, FE_Q<dim> (1), 1);
-
-//    dof_handler.distribute_dofs (fe_s);
-//    DynamicSparsityPattern dsp (dof_handler.n_dofs (), dof_handler.n_dofs ());
-//    DoFTools::make_sparsity_pattern (dof_handler, dsp);
-//    sparsity_pattern.copy_from (dsp);
-//    std::ofstream outf ("block.svg");
-//    sparsity_pattern.print_svg (outf);
-//    scanf("%d",&de);
-
-    BlockSparseMatrix<double> system_matrix_s;
-    BlockDynamicSparsityPattern dsp_s (2, 2);
-    const unsigned int n_d = dof_handler.n_dofs ();
-    dsp_s.block (0, 0).reinit (n_d, n_d);
-    dsp_s.block (1, 0).reinit (n_d, n_d);
-    dsp_s.block (0, 1).reinit (n_d, n_d);
-    dsp_s.block (1, 1).reinit (n_d, n_d);
-    dsp_s.collect_sizes ();
-    DoFHandler<dim> dof_handler_s (triangulation);
-    dof_handler_s.distribute_dofs (fe_s);
-    DoFRenumbering::component_wise (dof_handler_s);
-    DoFTools::make_sparsity_pattern (dof_handler_s, dsp_s);
-    BlockSparsityPattern sparsity_pattern_s;
-    sparsity_pattern_s.copy_from (dsp_s);
-
-    system_matrix_s.reinit (sparsity_pattern_s);
-    Vector<double> solution_s, system_rhs_s;
-    solution_s.reinit (2 * n_d);
-    system_rhs_s.reinit (2 * n_d);
-
-    SparseMatrix<double> D; // D=B+C;
-    D.reinit (sparsity_pattern);
-    D.copy_from (B);
-    D.add (1., C);
-
-    double c01 = 1. / 4. - sqrt (3) / 6., c10 = 1. / 4 + sqrt (3) / 6.;
-    for (unsigned int i = 0; i < A.m (); i++)
+    time = 0.;
+    for (timestep_number = 1; timestep_number < total_time_step;
+	timestep_number++)
       {
-	SparseMatrix<double>::iterator begin = A.begin (i), end = A.end (i);
-	for (; begin != end; ++begin)
+	time += time_step;
+	D.vmult (tmp, Xn);
+	tmp *= -1.;
+	for (int i = 0; i < n_dof; i++)
 	  {
-	    const dealii::SparseMatrixIterators::Accessor<double, false> acc =
-		*begin;
-	    int row = acc.row (), col = acc.column ();
-	    // block(0,0)
-	    system_matrix_s.set (row, col,
-				 A (row, col) + time_step / 4 * D (row, col));
-	    // block(0,1)
-	    system_matrix_s.set (row, col + n_d, c01 * D (row, col));
-	    // block(1,0)
-	    system_matrix_s.set (row + n_d, col, c10 * D (row, col));
-	    // block(1,1)
-	    system_matrix_s.set (row + n_d, col + n_d,
-				 A (row, col) + time_step / 4 * D (row, col));
+	    systemRhsBlock[i] = tmp[i];
+	    systemRhsBlock[i + n_dof] = tmp[i];
 	  }
-      }
-    printf ("B:\n");
-    B.print (std::cout);
-    printf ("C:\n");
-    C.print (std::cout);
-    printf ("D:\n");
-    D.print (std::cout);
-    printf ("system_matrix_s:\n");
-    system_matrix_s.print (std::cout);
-    scanf ("%d", &de);
-    // assmble rhs
-    Vector<double> tmp;
-    tmp.reinit (n_d);
-    D.vmult (tmp, Xn);
-    tmp *= -1.;
-    for (unsigned int i = 0; i < n_d; i++)
-      {
-	system_rhs_s[i] = tmp[i];
-	system_rhs_s[i + n_d] = tmp[i];
-      }
+	A_direct.vmult (solutionBlock, systemRhsBlock);
+	for (unsigned int i = 0; i < Xnp1.size (); i++)
+	  Xnp1[i] = Xn[i]
+	      + 0.5 * time_step * (solutionBlock[i] + solutionBlock[i + n_dof]);
 
-    SCFT::SCFTsolve SCFT_solve (system_matrix_s);
-    SolverControl solver_control (80000, 1e-17);
-
-    SolverCG<> cg (solver_control);
-
-    cg.solve (SCFT_solve, solution_s, system_rhs_s, PreconditionIdentity ());
-
-    // solve;
-
-//    SolverControl solver_control (80000, 1e-17);
-//    SolverCG<> solver (solver_control);
-//    solver.solve (system_matrix_s, solution_s, solution_s,
-//		  PreconditionIdentity ());
-
-    for (int i = 0; i < N; i++)
-      {
-	out[i] = f0_given[i] - f0[i]; // +yita_full_1D[i];  // for adm // so f0 and f0_given are full sized and so out is full sized.
-      }
-    return &out[1];
-  }
-
-template<int dim>
-  unsigned int
-  SCFT::HeatEquation<dim>::embedded_explicit_method (
-      const TimeStepping::runge_kutta_method method,
-      const unsigned int n_time_steps, const double initial_time,
-      const double final_time)
-  {
-    double time_step = (final_time - initial_time)
-	/ static_cast<double> (n_time_steps);
-    double time = initial_time;
-    const double coarsen_param = 1.2;
-    const double refine_param = 0.8;
-    const double min_delta = 1e-8;
-    const double max_delta = 1 * time_step;
-    const double refine_tol = 1e-1;
-    const double coarsen_tol = 1e-5;
-
-    TimeStepping::EmbeddedExplicitRungeKutta<Vector<double> > embedded_explicit_runge_kutta (
-	method, coarsen_param, refine_param, min_delta, max_delta, refine_tol,
-	coarsen_tol);
-
-    Vector<double> X_1D (N);
-
-    unsigned int n_steps = 0;
-    while (time < final_time)
-      {
-	if (time + time_step > final_time)
-	  time_step = final_time - time;
-
-	printf ("time=%f:Before solving, X=:\n\n", time);
-	for (int i = 0; i < N; i++)
-	  X_1D[i] = Xnp1[solution_table_1D_to_2D.find (i)->second];
-
-	X_1D.print (std::cout);
-	time = embedded_explicit_runge_kutta.evolve_one_time_step (
-	    std::bind (&HeatEquation<dim>::evaluate_diffusion, this,
-		       std::placeholders::_1, std::placeholders::_2),
-	    time, time_step, Xnp1);
-
-	printf ("time=%f:After solving, X=:\n\n", time);
-	for (int i = 0; i < N; i++)
-	  X_1D[i] = Xnp1[solution_table_1D_to_2D.find (i)->second];
-
-	X_1D.print (std::cout);
-
-	scanf ("%d", &de);
-
+	Xn = Xnp1;
 	solution_store[0][timestep_number] = time;
 	for (int i = 0; i < N; i++)
 	  {
@@ -320,36 +143,44 @@ template<int dim>
 		Xnp1[solution_table_1D_to_2D.find (i)->second];
 	  }
 
-	time_step = embedded_explicit_runge_kutta.get_status ().delta_t_guess;
-	++n_steps;
-	timestep_number++;
       }
 
-    return n_steps;
-  }
+    //       write solution;
 
-template<int dim>
-  dealii::Vector<double>
-  SCFT::HeatEquation<dim>::evaluate_diffusion (const double time,
-					       const Vector<double> &y) const // evaluate inv(A)*(-B*y-C*y)
-  {
-    Vector<double> tmp1 (dof_handler.n_dofs ());
-    tmp1 = 0.;
-    Vector<double> tmp2 (dof_handler.n_dofs ());
-    tmp2 = 0.;
+//      {
+//	FILE * fp;
+//	fp = fopen ("solution_store.txt", "w+");
+//	for (int i = 0; i < N + 1; i++)
+//	  {
+//	    for (int j = 0; j < total_time_step; j++)
+//	      fprintf (fp, "%2.15f,", solution_store[i][j]);
+//	    fprintf (fp, "\n");
+//	  }
+//
+//	fclose (fp);
+//      }
+//    scanf ("%d", &de);
 
-    const double factor = -1.;
+    /*   integrate for f0 use romint   */
+    double v_for_romint[total_time_step];
+    for (int i = 0; i < N; i++)
+      {
+	for (int j = 0; j < total_time_step; j++)
+	  {
+	    v_for_romint[j] = solution_store[i + 1][j]
+		* solution_store[i + 1][total_time_step - j];
+	  }
+	f0[i] = romint (v_for_romint, total_time_step,
+			1. / (total_time_step - 1));
+	//	  printf ("f0[%d]=%2.15f\n", i, f0[i]);
+      }
+    //      scanf ("%d", &de);
 
-    B.vmult (tmp1, y);
-    C.vmult (tmp2, y);
-    tmp1 *= -1.;
-    tmp1 -= tmp2;
-
-    Vector<double> value (dof_handler.n_dofs ());
-
-    inverse_mass_matrix.vmult (value, tmp1);
-
-    return value;
+    for (int i = 0; i < N; i++)
+      {
+	out[i] = f0_given[i] - f0[i]; // +yita_full_1D[i];  // for adm // so f0 and f0_given are full sized and so out is full sized.
+      }
+    return &out[1];
   }
 
 void
@@ -410,15 +241,15 @@ main ()
       heat_equation_solver = other; // I need this global class to do stuffs
       std::vector<double> interpolated_solution_yita_1D;
 
-      x_old.clear ();
-      x_old.resize (N, 0.);
-      double* out = heat_equation_solver.run (&x_old[0]);
-
-      for (int i = 0; i < N; i++)
-	printf ("out[%d]=%2.15f\n", i, out[i]);
+//      x_old.clear ();
+//      x_old.resize (N, 0.);
+//      double* out = heat_equation_solver.run (&x_old[0]);
+//
+//      for (int i = 0; i < N; i++)
+//	printf ("out[%d]=%2.15f\n", i, out[i]);
       /*--------------------------------------------------------------*/
 
-      return 0;
+//      return 0;
 
 #ifdef BROYDN
       int check = 1;

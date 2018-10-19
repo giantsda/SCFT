@@ -17,7 +17,8 @@ namespace SCFT
 				     double L) :
 	fe (1), dof_handler (triangulation), tau (tau), time (0.0), time_step (
 	    1. / (total_time_step - 1)), timestep_number (0), N (N), total_time_step (
-	    total_time_step), L (L), refine_times (0)
+	    total_time_step), n_dof (dof_handler.n_dofs ()), L (L), refine_times (
+	    0)
     {
       time_step = 1. / (total_time_step - 1);
       solution_store = Matcreate (N + 1, total_time_step + 1);
@@ -173,7 +174,8 @@ namespace SCFT
     {
       time = 0.;
       timestep_number = 0;
-      N = triangulation.n_active_cells () + 1;
+//      N = triangulation.n_active_cells () + 1;
+//      n_dof = dof_handler.n_dofs ();
       printf ("N=%d  \n", N);
       Matfree (solution_store);
       solution_store = Matcreate (N + 1, total_time_step + 1);
@@ -291,10 +293,36 @@ namespace SCFT
       B.reinit (sparsity_pattern);
       system_matrix.reinit (sparsity_pattern);
       C.reinit (sparsity_pattern);
+      D.reinit (sparsity_pattern);
       Xnp1.reinit (dof_handler.n_dofs ());
       Xn.reinit (dof_handler.n_dofs ());
       system_rhs.reinit (dof_handler.n_dofs ());
       N = triangulation.n_active_cells () + 1;
+      n_dof = dof_handler.n_dofs ();
+      solutionBlock.reinit (2 * n_dof);
+      systemRhsBlock.reinit (2 * n_dof);
+      tmp.reinit (n_dof);
+      constraint_matrix.clear ();
+
+      // Manually set SparsityPattern
+      DynamicSparsityPattern dspBlock (dof_handler.n_dofs () * 2);
+      for (unsigned int i = 0; i < A.m (); i++)
+	{
+	  SparseMatrix<double>::iterator begin = A.begin (i), end = A.end (i);
+	  for (; begin != end; ++begin)
+	    {
+	      const dealii::SparseMatrixIterators::Accessor<double, false> acc =
+		  *begin;
+	      unsigned int row = acc.row (), col = acc.column ();
+	      dspBlock.add (row, col);
+	      dspBlock.add (row, col + n_dof);
+	      dspBlock.add (row + n_dof, col);
+	      dspBlock.add (row + n_dof, col + n_dof);
+	    }
+	}
+      sparsityPatternBlock.copy_from (dspBlock);
+      systemMatrixBlock.reinit (sparsityPatternBlock);
+
       get_f0_given ();
       update_internal_data ();
       build_solution_table ();
@@ -379,23 +407,40 @@ namespace SCFT
 	  SparseMatrix<double>::iterator begin = C.begin (i), end = C.end (i);
 	  for (; begin != end; ++begin)
 	    {
-	      const dealii::SparseMatrixIterators::Accessor<double, false> acc = *begin;
+	      const dealii::SparseMatrixIterators::Accessor<double, false> acc =
+		  *begin;
 //	      std::cout << acc.row () << "  " << acc.column () << std::endl;
 	      acc.value () *= yita_full_2D[i];
 	    }
 	}
+      D.copy_from (B);
+      D.add (1., C);
 
-//      printf ("------------------------------------\n");
-//      A.print (std::cout);
-//
-//      int de;
-//      scanf ("%d", &de);
+      double c01 = (1. / 4. - sqrt (3) / 6.) * time_step, c10 = (1. / 4
+	  + sqrt (3) / 6.) * time_step;
+      for (unsigned int i = 0; i < A.m (); i++)
+	{
+	  SparseMatrix<double>::iterator begin = A.begin (i), end = A.end (i);
+	  for (; begin != end; ++begin)
+	    {
+	      const dealii::SparseMatrixIterators::Accessor<double, false> acc =
+		  *begin;
+	      int row = acc.row (), col = acc.column ();
+	      // block(0,0)
+	      systemMatrixBlock.set (
+		  row, col, A (row, col) + time_step / 4 * D (row, col));
+	      // block(0,1)
+	      systemMatrixBlock.set (row, col + n_dof, c01 * D (row, col));
+	      // block(1,0)
+	      systemMatrixBlock.set (row + n_dof, col, c10 * D (row, col));
+	      // block(1,1)
+	      systemMatrixBlock.set (
+		  row + n_dof, col + n_dof,
+		  A (row, col) + time_step / 4 * D (row, col));
+	    }
+	}
 
-      system_matrix.copy_from (A);
-      system_matrix.add (time_step, B);
-      system_matrix.add (time_step, C);
-
-      inverse_mass_matrix.initialize (A);
+      A_direct.initialize (systemMatrixBlock);
     }
 
   template<int dim>
