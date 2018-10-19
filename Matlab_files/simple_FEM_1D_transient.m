@@ -14,7 +14,7 @@ xold(end)=0;
 x_initial=xold;
 X=zeros(N,1);
 t=0;
-time_step=2048;
+time_step=2049;
 dt= 1/(time_step-1);
 solution_store=zeros(N+1,time_step);
 
@@ -78,12 +78,36 @@ D(N,:)=0;
 D(1,1)=1;
 D(N,N)=1;
 D_inv=inv(D);
+
+A(1,:)=0;
+A(N,:)=0;
+A(1,1)=1;
+A(N,N)=1;
 for T=1:time_step
+    %% Implicit Eluer
     b=A*xold;
     b(1)=0;
     b(N)=0;
-    %% solving
     X=D_inv*b;
+    %% KR4
+%     b=-(B+C)*xold;
+%     b(1)=0;
+%     b(N)=0;
+%     k1=A\b;
+%     b=-(B+C)*(xold+dt/2*k1);
+%     b(1)=0;
+%     b(N)=0;
+%     k2=A\b;
+%     b=-(B+C)*(xold+dt/2*k2);
+%     b(1)=0;
+%     b(N)=0;
+%     k3=A\b;
+%     b=-(B+C)*(xold+dt*k3);
+%     b(1)=0;
+%     b(N)=0;
+%     k4=A\b;
+%     X=xold+dt/6*(k1+2*k2+2*k3+k4);
+    %%
     t=t+dt;
     solution_store(:,T)=[t;X];
     xold=X;

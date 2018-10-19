@@ -40,6 +40,9 @@
 #include "NR_chen.h"
 #include <vector>
 
+#include <deal.II/base/time_stepping.h>
+#include <deal.II/lac/sparse_direct.h>
+
 namespace SCFT
 {
 
@@ -70,7 +73,8 @@ namespace SCFT
       int
       get_local_iteration () const;
       void
-      refine_mesh (std::vector<double> oldSolution, std::vector<double> & newSolution);
+      refine_mesh (std::vector<double> oldSolution,
+		   std::vector<double> & newSolution);
       void
       update_internal_data ();
       double *
@@ -89,6 +93,8 @@ namespace SCFT
       void
       setup_system ();
       void
+      assemble_system ();
+      void
       solve_time_step ();
       void
       output_results () const;
@@ -100,29 +106,32 @@ namespace SCFT
       Triangulation<dim> triangulation;
       FE_Q<dim> fe;
       DoFHandler<dim> dof_handler;
-      ConstraintMatrix constraints;
+      ConstraintMatrix constraint_matrix;
 
       SparsityPattern sparsity_pattern;
+      SparsityPattern sparsityPatternBlock;
       SparseMatrix<double> A; // A: mass matrix (fi[i],fi[j])
       SparseMatrix<double> B; // B: laplace_matrix (d(fi[i]),d(fi[j]))
       SparseMatrix<double> system_matrix;
       SparseMatrix<double> C; // C: (yita[i]*fi[i],fi[j])
+      SparseMatrix<double> D; // D: B+C
+      SparseMatrix<double> systemMatrixBlock;
 
       Vector<double> Xnp1;
       Vector<double> Xn;
-      Vector<double> X_internal_1;
-      Vector<double> X_internal_2;
-      Vector<double> X_internal_3;
       Vector<double> system_rhs;
+      Vector<double> solutionBlock, systemRhsBlock,tmp;
 
       double tau;
       double time;
       double time_step;
       int timestep_number;
       int N, total_time_step, local_iteration;
+      int n_dof;
       double** solution_store;
       double L;
       Vector<double> f0;
+      double* yita_middle_1D;
       Vector<double> yita_full_1D;
       Vector<double> yita_full_2D;
       Vector<double> out;
@@ -132,6 +141,7 @@ namespace SCFT
       std::map<int, int> solution_table_2D_to_1D;
       std::map<double, int> solution_table_x_to_2D;
       std::map<int, double> solution_table_2D_to_x;
+      SparseDirectUMFPACK A_direct;
     };
 
 }

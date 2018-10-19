@@ -56,7 +56,7 @@ adm_chen (void
     {
       f (n, X[k], Y[k]);
       double err = 0.; // evaluate err
-      for (unsigned int i = 0; i < n; i++)
+      for (int i = 0; i < n; i++)
 	{
 	  if (fabs (Y[k][i]) >= err)
 	    err = fabs (Y[k][i]);

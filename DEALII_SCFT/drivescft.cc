@@ -28,6 +28,8 @@
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/grid_out.h>
+#include <deal.II/fe/fe_system.h>
+#include <deal.II/dofs/dof_renumbering.h>
 
 #include "NR_chen.h"
 #include "SCFT.h"
@@ -45,6 +47,7 @@
 int de; // My debug varaibe
 
 SCFT::HeatEquation<2> heat_equation_solver;
+
 namespace dealii
 {
   template<int dim>
@@ -78,9 +81,8 @@ template<int dim>
   double *
   SCFT::HeatEquation<dim>::run (double* yita_middle_1D_in)
   {
-    std::vector<double> yita_full_1D (N, 0.);
-    for (int i = 0; i < N - 2; i++)
-      yita_full_1D[i + 1] = yita_middle_1D_in[i];
+    yita_middle_1D = yita_middle_1D_in; //set yita_middle_1D
+
     if (refine_times == 0)
       {
 	if (1)
@@ -106,73 +108,32 @@ template<int dim>
 	// Next time, it is setup in the refine();
 	refine_times++;
       }
-//    std::cout << "Number of active cells: " << triangulation.n_active_cells ()
-//	<< std::endl;
+    assemble_system ();
 
     VectorTools::interpolate (dof_handler, Initial_condition<dim> (), Xn);
     Xnp1 = Xn;
-
-    // convert yita_full_1D to yita_full_2D;
-    for (int i = 0; i < 2 * N; i++)
-      {
-	int j = solution_table_2D_to_1D.find (i)->second;
-	yita_full_2D[i] = yita_full_1D[j];
-      }
-
-//      for (int i = 0; i < 2 * N; i++)
-//	printf ("yita_full_2D[%d]=%2.15f \n", i, yita_full_2D[i]);
-//      scanf ("%d", &de);
-
-    system_matrix.copy_from (A);
-    system_matrix.add (time_step, B);
-    C.copy_from (A);
-    for (unsigned int i = 0; i < C.m (); i++)
-      {
-	SparseMatrix<double>::iterator begin = C.begin (i), end = C.end (i);
-	for (; begin != end; ++begin)
-	  {
-	    begin->value () *= yita_full_2D[i];
-	  }
-      }
-    system_matrix.add (time_step, C);
 
     for (int i = 2; i < N; i++)
       solution_store[i][0] = 1.;
     solution_store[0][0] = 0.;
     solution_store[N][0] = 0.;
 
-    std::map<types::global_dof_index, double> boundary_values_l,
-	boundary_values_r;
-    VectorTools::interpolate_boundary_values (dof_handler, 0,
-					      ZeroFunction<2> (),
-					      boundary_values_l);
-    MatrixTools::apply_boundary_values (boundary_values_l, system_matrix, Xnp1,
-					system_rhs);
-    VectorTools::interpolate_boundary_values (dof_handler, 1,
-					      ConstantFunction<2> (0.),
-					      boundary_values_r);
-    MatrixTools::apply_boundary_values (boundary_values_r, system_matrix, Xnp1,
-					system_rhs);
     time = 0.;
     for (timestep_number = 1; timestep_number < total_time_step;
 	timestep_number++)
       {
 	time += time_step;
-	A.vmult (system_rhs, Xn);
-
-	// Manually apply BC;
-	for (auto itr = boundary_values_l.begin ();
-	    itr != boundary_values_l.end (); ++itr)
+	D.vmult (tmp, Xn);
+	tmp *= -1.;
+	for (int i = 0; i < n_dof; i++)
 	  {
-	    system_rhs[itr->first] = itr->second;
+	    systemRhsBlock[i] = tmp[i];
+	    systemRhsBlock[i + n_dof] = tmp[i];
 	  }
-	for (auto itr = boundary_values_r.begin ();
-	    itr != boundary_values_r.end (); ++itr)
-	  {
-	    system_rhs[itr->first] = itr->second;
-	  }
-
-	solve_time_step ();
+	A_direct.vmult (solutionBlock, systemRhsBlock);
+	for (unsigned int i = 0; i < Xnp1.size (); i++)
+	  Xnp1[i] = Xn[i]
+	      + 0.5 * time_step * (solutionBlock[i] + solutionBlock[i + n_dof]);
 
 	Xn = Xnp1;
 	solution_store[0][timestep_number] = time;
@@ -184,7 +145,7 @@ template<int dim>
 
       }
 
-//       write solution;
+    //       write solution;
 
 //      {
 //	FILE * fp;
@@ -198,7 +159,7 @@ template<int dim>
 //
 //	fclose (fp);
 //      }
-//      scanf ("%d", &de);
+//    scanf ("%d", &de);
 
     /*   integrate for f0 use romint   */
     double v_for_romint[total_time_step];
@@ -211,13 +172,13 @@ template<int dim>
 	  }
 	f0[i] = romint (v_for_romint, total_time_step,
 			1. / (total_time_step - 1));
-//	  printf ("f0[%d]=%2.15f\n", i, f0[i]);
+	//	  printf ("f0[%d]=%2.15f\n", i, f0[i]);
       }
-//      scanf ("%d", &de);
+    //      scanf ("%d", &de);
 
     for (int i = 0; i < N; i++)
       {
-	out[i] = f0_given[i] - f0[i];// +yita_full_1D[i];  // for adm // so f0 and f0_given are full sized and so out is full sized.
+	out[i] = f0_given[i] - f0[i]; // +yita_full_1D[i];  // for adm // so f0 and f0_given are full sized and so out is full sized.
       }
     return &out[1];
   }
@@ -234,10 +195,10 @@ SCFT_wrapper (int N, double * in, double * out)
 
 #ifdef BROYDN
   for (int i = 0; i < N - 2; i++)
-    out[i + 1] = res[i];
+  out[i + 1] = res[i];
 #else
   for (int i = 0; i < N - 2; i++)
-  out[i] = res[i];
+    out[i] = res[i];
 #endif
   int local_interation = heat_equation_solver.get_local_iteration ();
 //  for (int i = 0; i < N; i++)
@@ -275,14 +236,18 @@ main ()
       std::vector<double> x_old; // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
       double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
       read_yita_middle_1D (x_old, "inputFiles/N=33_for_read.txt", N); // read data from file, also set N;
+      N = 33;
       HeatEquation<2> other (tau, N, 2049, L); /* 2049 are points, 2048 intervals */
       heat_equation_solver = other; // I need this global class to do stuffs
       std::vector<double> interpolated_solution_yita_1D;
-//      double* out=heat_equation_solver.run (&x_old[0]);
 
-//      for(int i=0;i<N;i++)
-//	printf("out[%d]=%2.15f\n",i,out[i]);
-//      /*--------------------------------------------------------------*/
+//      x_old.clear ();
+//      x_old.resize (N, 0.);
+//      double* out = heat_equation_solver.run (&x_old[0]);
+//
+//      for (int i = 0; i < N; i++)
+//	printf ("out[%d]=%2.15f\n", i, out[i]);
+//      return 0;
 
 #ifdef BROYDN
       int check = 1;
@@ -295,15 +260,16 @@ main ()
 
       for (int i = 0; i < 10; i++)
 	{
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-1, 200, N - 2,0.99,2);
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-4, 400, N - 2,0.9,5);
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 800, N - 2,0.9,15);
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2,0.9,30);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-1, 200, N - 2, 0.99, 2);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-4, 400, N - 2, 0.9, 5);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 800, N - 2, 0.9, 15);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.9, 30);
 //	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
 	  heat_equation_solver.print_and_save_yita_1D (x_old);
 	  heat_equation_solver.output_results_for_yita_full_2D ();
 	  heat_equation_solver.output_mesh ();
-	  heat_equation_solver.refine_mesh (x_old,interpolated_solution_yita_1D);
+	  heat_equation_solver.refine_mesh (x_old,
+					    interpolated_solution_yita_1D);
 	  N = heat_equation_solver.get_N ();
 #ifdef BROYDN
 	  free_dmatrix (qt, 1, N - 2, 1, N - 2);
