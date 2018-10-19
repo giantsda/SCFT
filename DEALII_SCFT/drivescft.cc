@@ -28,6 +28,8 @@
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/grid_out.h>
+#include <deal.II/fe/fe_system.h>
+#include <deal.II/dofs/dof_renumbering.h>
 
 #include "NR_chen.h"
 #include "SCFT.h"
@@ -75,6 +77,57 @@ namespace dealii
     }
 }
 
+namespace SCFT
+{
+  class SCFTsolve : public Subscriptor
+  {
+  public:
+    SCFTsolve (const BlockSparseMatrix<double> &A);
+    void
+    vmult (Vector<double> &dst, const Vector<double> &src) const;
+  private:
+    const SmartPointer<const BlockSparseMatrix<double> > system_matrix;
+    mutable Vector<double> srcUp, srcLow, resUp, resLow;
+  };
+
+  SCFTsolve::SCFTsolve (const BlockSparseMatrix<double> &A) :
+      system_matrix (&A), srcUp (A.block (0, 0).m ()), srcLow (
+	  A.block (0, 0).m ()), resUp (A.block (0, 0).m ()), resLow (
+	  A.block (0, 0).m ())
+  {
+  }
+
+  void
+  SCFTsolve::vmult (Vector<double> &dst, const Vector<double> &src) const
+  {
+    int n_dof = src.size () / 2;
+    for (int i = 0; i < n_dof; i++)
+      {
+	srcUp[i] = src[i];
+	srcLow[i] = src[i + n_dof];
+      }
+    Vector<double> tmp1, tmp2;
+    tmp1.reinit (n_dof);
+    tmp2.reinit (n_dof);
+
+    system_matrix->block (0, 0).vmult (tmp1, srcUp);
+    system_matrix->block (0, 1).vmult (tmp2, srcLow);
+    resUp = tmp1;
+    resUp += tmp2;
+    system_matrix->block (1, 0).vmult (tmp1, srcUp);
+    system_matrix->block (1, 1).vmult (tmp2, srcLow);
+    resLow = tmp1;
+    resLow += tmp2;
+
+    for (int i = 0; i < n_dof; i++)
+      {
+	dst[i] = resUp[i];
+	dst[i + n_dof] = resLow[i];
+      }
+  }
+
+}
+
 template<int dim>
   double *
   SCFT::HeatEquation<dim>::run (double* yita_middle_1D_in)
@@ -116,61 +169,99 @@ template<int dim>
     solution_store[0][0] = 0.;
     solution_store[N][0] = 0.;
 
-    std::map<types::global_dof_index, double> boundary_values_l,
-	boundary_values_r;
-    VectorTools::interpolate_boundary_values (dof_handler, 0,
-					      ZeroFunction<2> (),
-					      boundary_values_l);
-    MatrixTools::apply_boundary_values (boundary_values_l, system_matrix, Xnp1,
-					system_rhs);
-    VectorTools::interpolate_boundary_values (dof_handler, 1,
-					      ConstantFunction<2> (0.),
-					      boundary_values_r);
-    MatrixTools::apply_boundary_values (boundary_values_r, system_matrix, Xnp1,
-					system_rhs);
+    FESystem<dim> fe_s (FE_Q<dim> (1), 1, FE_Q<dim> (1), 1);
 
-    unsigned int n_steps = 0;
-    const unsigned int n_time_steps = 2049;
-    const double initial_time = 0.;
-    const double final_time = 1.;
+//    dof_handler.distribute_dofs (fe_s);
+//    DynamicSparsityPattern dsp (dof_handler.n_dofs (), dof_handler.n_dofs ());
+//    DoFTools::make_sparsity_pattern (dof_handler, dsp);
+//    sparsity_pattern.copy_from (dsp);
+//    std::ofstream outf ("block.svg");
+//    sparsity_pattern.print_svg (outf);
+//    scanf("%d",&de);
 
-    n_steps = embedded_explicit_method (TimeStepping::DOPRI, n_time_steps,
-					initial_time, final_time);
+    BlockSparseMatrix<double> system_matrix_s;
+    BlockDynamicSparsityPattern dsp_s (2, 2);
+    const unsigned int n_d = dof_handler.n_dofs ();
+    dsp_s.block (0, 0).reinit (n_d, n_d);
+    dsp_s.block (1, 0).reinit (n_d, n_d);
+    dsp_s.block (0, 1).reinit (n_d, n_d);
+    dsp_s.block (1, 1).reinit (n_d, n_d);
+    dsp_s.collect_sizes ();
+    DoFHandler<dim> dof_handler_s (triangulation);
+    dof_handler_s.distribute_dofs (fe_s);
+    DoFRenumbering::component_wise (dof_handler_s);
+    DoFTools::make_sparsity_pattern (dof_handler_s, dsp_s);
+    BlockSparsityPattern sparsity_pattern_s;
+    sparsity_pattern_s.copy_from (dsp_s);
 
-    //       write solution;
+    system_matrix_s.reinit (sparsity_pattern_s);
+    Vector<double> solution_s, system_rhs_s;
+    solution_s.reinit (2 * n_d);
+    system_rhs_s.reinit (2 * n_d);
 
+    SparseMatrix<double> D; // D=B+C;
+    D.reinit (sparsity_pattern);
+    D.copy_from (B);
+    D.add (1., C);
+
+    double c01 = 1. / 4. - sqrt (3) / 6., c10 = 1. / 4 + sqrt (3) / 6.;
+    for (unsigned int i = 0; i < A.m (); i++)
       {
-	FILE * fp;
-	fp = fopen ("solution_store.txt", "w+");
-	for (int i = 0; i < N + 1; i++)
+	SparseMatrix<double>::iterator begin = A.begin (i), end = A.end (i);
+	for (; begin != end; ++begin)
 	  {
-	    for (int j = 0; j < total_time_step; j++)
-	      fprintf (fp, "%2.15f,", solution_store[i][j]);
-	    fprintf (fp, "\n");
+	    const dealii::SparseMatrixIterators::Accessor<double, false> acc =
+		*begin;
+	    int row = acc.row (), col = acc.column ();
+	    // block(0,0)
+	    system_matrix_s.set (row, col,
+				 A (row, col) + time_step / 4 * D (row, col));
+	    // block(0,1)
+	    system_matrix_s.set (row, col + n_d, c01 * D (row, col));
+	    // block(1,0)
+	    system_matrix_s.set (row + n_d, col, c10 * D (row, col));
+	    // block(1,1)
+	    system_matrix_s.set (row + n_d, col + n_d,
+				 A (row, col) + time_step / 4 * D (row, col));
 	  }
-
-	fclose (fp);
       }
+    printf ("B:\n");
+    B.print (std::cout);
+    printf ("C:\n");
+    C.print (std::cout);
+    printf ("D:\n");
+    D.print (std::cout);
+    printf ("system_matrix_s:\n");
+    system_matrix_s.print (std::cout);
     scanf ("%d", &de);
-
-    /*   integrate for f0 use romint   */
-    double v_for_romint[total_time_step];
-    for (int i = 0; i < N; i++)
+    // assmble rhs
+    Vector<double> tmp;
+    tmp.reinit (n_d);
+    D.vmult (tmp, Xn);
+    tmp *= -1.;
+    for (unsigned int i = 0; i < n_d; i++)
       {
-	for (int j = 0; j < total_time_step; j++)
-	  {
-	    v_for_romint[j] = solution_store[i + 1][j]
-		* solution_store[i + 1][total_time_step - j];
-	  }
-	f0[i] = romint (v_for_romint, total_time_step,
-			1. / (total_time_step - 1));
-//	  printf ("f0[%d]=%2.15f\n", i, f0[i]);
+	system_rhs_s[i] = tmp[i];
+	system_rhs_s[i + n_d] = tmp[i];
       }
-//      scanf ("%d", &de);
+
+    SCFT::SCFTsolve SCFT_solve (system_matrix_s);
+    SolverControl solver_control (80000, 1e-17);
+
+    SolverCG<> cg (solver_control);
+
+    cg.solve (SCFT_solve, solution_s, system_rhs_s, PreconditionIdentity ());
+
+    // solve;
+
+//    SolverControl solver_control (80000, 1e-17);
+//    SolverCG<> solver (solver_control);
+//    solver.solve (system_matrix_s, solution_s, solution_s,
+//		  PreconditionIdentity ());
 
     for (int i = 0; i < N; i++)
       {
-	out[i] = f0_given[i] - f0[i];// +yita_full_1D[i];  // for adm // so f0 and f0_given are full sized and so out is full sized.
+	out[i] = f0_given[i] - f0[i]; // +yita_full_1D[i];  // for adm // so f0 and f0_given are full sized and so out is full sized.
       }
     return &out[1];
   }

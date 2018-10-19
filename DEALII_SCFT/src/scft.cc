@@ -311,11 +311,11 @@ namespace SCFT
       C = 0.;
 
       VectorTools::interpolate_boundary_values (dof_handler, 0,
-						Functions::ZeroFunction<dim> (),
+						ZeroFunction<dim> (),
 						constraint_matrix);
 
       VectorTools::interpolate_boundary_values (dof_handler, 1,
-						Functions::ZeroFunction<dim> (),
+						ZeroFunction<dim> (),
 						constraint_matrix);
       constraint_matrix.close ();
 
@@ -374,29 +374,26 @@ namespace SCFT
 	  yita_full_2D[i] = yita_full_1D[j];
 	}
       C.copy_from (A);
-      printf ("C:before yita\n");
-      C.print (std::cout);
-
       for (unsigned int i = 0; i < C.m (); i++)
 	{
 	  SparseMatrix<double>::iterator begin = C.begin (i), end = C.end (i);
 	  for (; begin != end; ++begin)
 	    {
-	      begin->value () *= yita_full_2D[i];
+	      const dealii::SparseMatrixIterators::Accessor<double, false> acc = *begin;
+//	      std::cout << acc.row () << "  " << acc.column () << std::endl;
+	      acc.value () *= yita_full_2D[i];
 	    }
 	}
 
-      printf ("C:after yita\n");
-      C.print (std::cout);
-
-      int de;
-      scanf ("%d", &de);
+//      printf ("------------------------------------\n");
+//      A.print (std::cout);
+//
+//      int de;
+//      scanf ("%d", &de);
 
       system_matrix.copy_from (A);
       system_matrix.add (time_step, B);
       system_matrix.add (time_step, C);
-
-
 
       inverse_mass_matrix.initialize (A);
     }
