@@ -16,7 +16,7 @@ X=zeros(N,1);
 t=0;
 time_step=2049;
 dt= 1/(time_step-1);
-solution_store=zeros(N+1,time_step);
+solution_store=zeros(N+1,time_step-1);
 
 %% allcate memory
 % A=sparse(N,N);
@@ -93,7 +93,7 @@ C(N,:)=0;
 C(1,1)=1;
 C(N,N)=1;
 
-for T=1:time_step
+for T=1:time_step-1
     %     b=A*xold;
     %     b(1)=0;
     %     b(N)=0;
@@ -123,9 +123,9 @@ solution_store=[[0;x_initial] solution_store];
 %% integrate for f0
 
 f0=zeros(N+1,1);
-for j=1:time_step
-    value_left=solution_store(:,j).*solution_store(:,time_step-j+2);
-    value_right=solution_store(:,j+1).*solution_store(:,time_step-(j+1)+2);
+for j=1:time_step-1
+    value_left=solution_store(:,j).*solution_store(:,time_step-j+1);
+    value_right=solution_store(:,j+1).*solution_store(:,time_step-(j+1)+1);
     f0=f0+0.5*(value_left+value_right)*dt;
 end
 f0(1)=[];
