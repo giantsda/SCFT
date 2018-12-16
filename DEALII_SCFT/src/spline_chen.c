@@ -15,7 +15,7 @@ spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
 /* x,y is the table waiting to be interpolated.
  x from [0 Nx];
  xp is the x vector you want to know yp at.
- is m==NULL use not-a-knot end condition
+ if m==NULL use not-a-knot end condition
  m=0 for natural spline;
  otherwise m is the ddy at boundarys
  */
