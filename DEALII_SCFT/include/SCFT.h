@@ -92,6 +92,8 @@ namespace SCFT
       void
       set_yita_full_1D (double* solution_2D, std::vector<double>& vec_1D);
       void
+      build_lookup_table ();
+      void
       print_and_save_yita_1D (std::vector<double> solution);
 
     private:
@@ -140,7 +142,10 @@ namespace SCFT
       Vector<double> out;
       Vector<double> f0_given;
       int refine_times;
+      std::map<int, int> lookup_table_1D_to_2D;
+      std::map<int, int> lookup_table_2D_to_1D;
       SparseDirectUMFPACK A_direct;
+      int iteration;
     };
 
 }

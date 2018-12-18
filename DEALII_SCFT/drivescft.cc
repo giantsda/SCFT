@@ -108,8 +108,20 @@ template<int dim>
 	// Next time, it is setup in the refine();
 	refine_times++;
       }
+    if (iteration == 0)
+      {
+	build_lookup_table ();
+      }
 
-    set_yita_full_2D (yita_middle_1D);
+    for (int i = 1; i < N - 1; i++)
+      yita_full_1D[i] = yita_middle_1D[i - 1];
+    yita_full_1D[0] = 0.;
+    yita_full_1D[N - 1] = 0.;
+
+    for (unsigned int i = 0; i < yita_full_2D.size (); i++)
+      {
+	yita_full_2D[i] = yita_full_1D[lookup_table_2D_to_1D.find (i)->second];
+      }
 
     assemble_system ();
 
@@ -140,13 +152,11 @@ template<int dim>
 
 	Xn = Xnp1;
 	solution_store[0][timestep_number] = time;
-	std::vector<double> Xnp1_1D (N, 0.);
-
-	set_yita_full_1D (&Xnp1[0], Xnp1_1D);
 
 	for (int i = 0; i < N; i++)
 	  {
-	    solution_store[i + 1][timestep_number] = Xnp1_1D[i];
+	    solution_store[i + 1][timestep_number] =
+		Xnp1[lookup_table_1D_to_2D.find (i)->second];
 	  }
 
       }
@@ -161,7 +171,6 @@ template<int dim>
 //	      fprintf (fp, "%2.15f,", solution_store[i][j]);
 //	    fprintf (fp, "\n");
 //	  }
-//
 //	fclose (fp);
 //      }
 //    scanf ("%d", &de);
@@ -184,6 +193,7 @@ template<int dim>
       {
 	out[i] = f0_given[i] - f0[i]; // +yita_full_1D[i];  // for adm // so f0 and f0_given are full sized and so out is full sized.
       }
+    iteration++;
     return &out[1];
   }
 
@@ -248,6 +258,7 @@ main ()
 //      double* res = heat_equation_solver.run (&x_old[1]);
 //      for (int i = 0; i < N; i++)
 //	printf ("%2.15f\n", res[i]);
+//      return 0;
 
       //      x_old.clear ();
       //      x_old.resize (N, 0.);
@@ -269,7 +280,6 @@ main ()
       for (int i = 0; i < 10; i++)
 	{
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-1, 200, N - 2, 0.99, 2);
-	  return 0;
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-4, 400, N - 2, 0.9, 5);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 800, N - 2, 0.9, 15);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.9, 30);

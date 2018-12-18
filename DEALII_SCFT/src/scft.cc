@@ -16,12 +16,12 @@ template class std::vector<dealii::Point<2>>;
 namespace SCFT
 {
   template<int dim>
-    HeatEquation<dim>::HeatEquation (double tau, int N, int total_time_step,
-				     double L) :
-	fe (1), dof_handler (triangulation), tau (tau), time (0.0), time_step (
-	    1. / (total_time_step - 1)), timestep_number (0), N (N), total_time_step (
-	    total_time_step), n_dof (dof_handler.n_dofs ()), L (L), refine_times (
-	    0)
+  HeatEquation<dim>::HeatEquation (double tau, int N, int total_time_step,
+      double L) :
+  fe (1), dof_handler (triangulation), tau (tau), time (0.0), time_step (
+      1. / (total_time_step - 1)), timestep_number (0), N (N), total_time_step (
+      total_time_step), n_dof (dof_handler.n_dofs ()), L (L), refine_times (
+      0), iteration (0)
     {
       time_step = 1. / (total_time_step - 1);
       solution_store = Matcreate (N + 1, total_time_step + 1);
@@ -60,7 +60,7 @@ namespace SCFT
       yita_full_2D = other.yita_full_2D;
       local_iteration = other.local_iteration;
       out = other.out;
-
+      iteration = other.iteration;
       return *this;
     }
 
@@ -186,6 +186,9 @@ namespace SCFT
       yita_full_1D.reinit (N);
       yita_full_2D.reinit (2 * N);
       out.reinit (N);
+      lookup_table_1D_to_2D.clear ();
+      lookup_table_2D_to_1D.clear ();
+      iteration=0;
     }
 
   template<int dim>
@@ -292,6 +295,7 @@ namespace SCFT
 	  px = support_points[i] (0);
 	  int index = std::lower_bound (x.begin (), x.end (), px) - x.begin ();
 	  yita_full_2D[i] = yita_full_1D_temp[index];
+//	  std::cout << i << "-->" << index << std::endl;
 	}
 
     }
@@ -314,6 +318,31 @@ namespace SCFT
 
 	  int index = std::lower_bound (x.begin (), x.end (), px) - x.begin ();
 	  vec_1D[index] = solution_2D[i];
+	}
+
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::build_lookup_table ()
+    {
+      std::vector<double> x;
+      get_x (x);
+      std::vector<double> yita_full_1D_temp (N, 0.);
+      for (int i = 1; i < N - 1; i++)
+	yita_full_1D_temp[i] = yita_middle_1D[i - 1];
+
+      MappingQ1<dim> mapping;
+      std::vector<Point<dim> > support_points (dof_handler.n_dofs ());
+      DoFTools::map_dofs_to_support_points<dim> (mapping, dof_handler,
+						 support_points);
+      double px;
+      for (unsigned int i = 0; i < support_points.size (); i++)
+	{
+	  px = support_points[i] (0);
+	  int index = std::lower_bound (x.begin (), x.end (), px) - x.begin ();
+	  lookup_table_1D_to_2D.insert (std::pair<int, int> (index, i));
+	  lookup_table_2D_to_1D.insert (std::pair<int, int> (i, index));
 	}
 
     }
