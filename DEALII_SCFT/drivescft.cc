@@ -113,16 +113,7 @@ template<int dim>
 	build_lookup_table ();
       }
 
-    for (int i = 1; i < N - 1; i++)
-      yita_full_1D[i] = yita_middle_1D[i - 1];
-    yita_full_1D[0] = 0.;
-    yita_full_1D[N - 1] = 0.;
-
-    for (unsigned int i = 0; i < yita_full_2D.size (); i++)
-      {
-	yita_full_2D[i] = yita_full_1D[lookup_table_2D_to_1D.find (i)->second];
-      }
-
+    set_yita_full_2D ();
     assemble_system ();
 
     VectorTools::interpolate (dof_handler, Initial_condition<dim> (), Xn);
@@ -255,17 +246,11 @@ main ()
       heat_equation_solver = other; // I need this global class to do stuffs
       std::vector<double> interpolated_solution_yita_1D;
 
-//      double* res = heat_equation_solver.run (&x_old[1]);
-//      for (int i = 0; i < N; i++)
-//	printf ("%2.15f\n", res[i]);
-//      return 0;
-
       //      x_old.clear ();
       //      x_old.resize (N, 0.);
-      //      double* out = heat_equation_solver.run (&x_old[0]);
-      //
+      //      double* res = heat_equation_solver.run (&x_old[1]);
       //      for (int i = 0; i < N; i++)
-      //	printf ("out[%d]=%2.15f\n", i, out[i]);
+      //	printf ("%2.15f\n", res[i]);
       //      return 0;
 
 #ifdef BROYDN
@@ -277,7 +262,7 @@ main ()
       err = 0.00000001;
 #endif
 
-      for (int i = 0; i < 10; i++)
+      for (int i = 0; i < 1; i++)
 	{
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-1, 200, N - 2, 0.99, 2);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-4, 400, N - 2, 0.9, 5);

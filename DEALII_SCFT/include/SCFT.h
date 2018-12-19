@@ -88,9 +88,7 @@ namespace SCFT
       void
       output_mesh ();
       void
-      set_yita_full_2D (double* yita_middle_1D);
-      void
-      set_yita_full_1D (double* solution_2D, std::vector<double>& vec_1D);
+      set_yita_full_2D (); // use cubic spline interpotation
       void
       build_lookup_table ();
       void

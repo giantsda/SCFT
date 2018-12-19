@@ -16,19 +16,18 @@ template class std::vector<dealii::Point<2>>;
 namespace SCFT
 {
   template<int dim>
-  HeatEquation<dim>::HeatEquation (double tau, int N, int total_time_step,
-      double L) :
-  fe (1), dof_handler (triangulation), tau (tau), time (0.0), time_step (
-      1. / (total_time_step - 1)), timestep_number (0), N (N), total_time_step (
-      total_time_step), n_dof (dof_handler.n_dofs ()), L (L), refine_times (
-      0), iteration (0)
+    HeatEquation<dim>::HeatEquation (double tau, int N, int total_time_step,
+				     double L) :
+	fe (1), dof_handler (triangulation), tau (tau), time (0.0), time_step (
+	    1. / (total_time_step - 1)), timestep_number (0), N (N), total_time_step (
+	    total_time_step), n_dof (dof_handler.n_dofs ()), L (L), refine_times (
+	    0), iteration (0)
     {
       time_step = 1. / (total_time_step - 1);
       solution_store = Matcreate (N + 1, total_time_step + 1);
       f0.reinit (N);
       yita_middle_1D = NULL;
       yita_full_1D.reinit (N);
-      yita_full_2D.reinit (2 * N);
       out.reinit (N);
       f0_given.reinit (N);
       local_iteration = 0;
@@ -134,9 +133,9 @@ namespace SCFT
     {
 #undef float
       Vector<float> estimated_error_per_cell (triangulation.n_active_cells ());
-      Vector<double> yita_full_2D_t (N * 2);
+      Vector<double> yita_full_2D_t (dof_handler.n_dofs ());
 
-      for (int i = 0; i < 2 * N; i++)
+      for (unsigned int i = 0; i < yita_full_2D.size (); i++)
 	yita_full_2D_t[i] = yita_full_2D[i];
 
       KellyErrorEstimator<dim>::estimate (dof_handler,
@@ -177,18 +176,15 @@ namespace SCFT
     {
       time = 0.;
       timestep_number = 0;
-      //      N = triangulation.n_active_cells () + 1;
-      //      n_dof = dof_handler.n_dofs ();
       printf ("N=%d  \n", N);
       Matfree (solution_store);
       solution_store = Matcreate (N + 1, total_time_step + 1);
       f0.reinit (N);
       yita_full_1D.reinit (N);
-      yita_full_2D.reinit (2 * N);
       out.reinit (N);
       lookup_table_1D_to_2D.clear ();
       lookup_table_2D_to_1D.clear ();
-      iteration=0;
+      iteration = 0;
     }
 
   template<int dim>
@@ -277,49 +273,41 @@ namespace SCFT
 
   template<int dim>
     void
-    HeatEquation<dim>::set_yita_full_2D (double* yita_middle_1D)
+    HeatEquation<dim>::set_yita_full_2D ()
     {
       std::vector<double> x;
       get_x (x);
-      std::vector<double> yita_full_1D_temp (N, 0.);
-      for (int i = 1; i < N - 1; i++)
-	yita_full_1D_temp[i] = yita_middle_1D[i - 1];
+      x.pop_back (); // remove the last and the first elements
+      x.erase (x.begin ()); // yita_middle_1D si a double*
 
       MappingQ1<dim> mapping;
       std::vector<Point<dim> > support_points (dof_handler.n_dofs ());
       DoFTools::map_dofs_to_support_points<dim> (mapping, dof_handler,
 						 support_points);
-      double px;
+      double* xp = (double*) malloc (sizeof(double) * support_points.size ());
+      double* yp = (double*) malloc (sizeof(double) * support_points.size ());
       for (unsigned int i = 0; i < support_points.size (); i++)
 	{
-	  px = support_points[i] (0);
-	  int index = std::lower_bound (x.begin (), x.end (), px) - x.begin ();
-	  yita_full_2D[i] = yita_full_1D_temp[index];
-//	  std::cout << i << "-->" << index << std::endl;
+	  xp[i] = support_points[i] (0);
 	}
 
-    }
+      double m = 0.;
+      spline_chen (&x[0], yita_middle_1D, xp, yp, x.size (),
+		   support_points.size (), &m);
 
-  template<int dim>
-    void
-    HeatEquation<dim>::set_yita_full_1D (double* solution_2D,
-					 std::vector<double>& vec_1D)
-    {
-      std::vector<double> x;
-      get_x (x);
-      MappingQ1<dim> mapping;
-      std::vector<Point<dim> > support_points (dof_handler.n_dofs ());
-      DoFTools::map_dofs_to_support_points<dim> (mapping, dof_handler,
-						 support_points);
-      double px;
+//      for (int i = 0; i < support_points.size (); i++)
+//	printf ("%2.15f\n", yp[i]);
+
       for (unsigned int i = 0; i < support_points.size (); i++)
 	{
-	  px = support_points[i] (0);
-
-	  int index = std::lower_bound (x.begin (), x.end (), px) - x.begin ();
-	  vec_1D[index] = solution_2D[i];
+	  yita_full_2D[i] = yp[i];
 	}
 
+      free (xp);
+      free (yp);
+
+//      int de;
+//      scanf ("%d", &de);
     }
 
   template<int dim>
@@ -345,6 +333,23 @@ namespace SCFT
 	  lookup_table_2D_to_1D.insert (std::pair<int, int> (i, index));
 	}
 
+      /* print lookup tables */
+//      printf("lookup_table_1D_to_2D:\n");
+//      for (auto itr = lookup_table_1D_to_2D.begin ();
+//	  itr != lookup_table_1D_to_2D.end (); ++itr)
+//	{
+//	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
+//	}
+//      std::cout << std::endl;
+//      printf("lookup_table_2D_to_1D:\n");
+//      for (auto itr = lookup_table_2D_to_1D.begin ();
+//	  itr != lookup_table_2D_to_1D.end (); ++itr)
+//	{
+//	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
+//	}
+//      std::cout << std::endl;
+//      int de;
+//      scanf("%d",&de);
     }
 
   template<int dim>
@@ -370,6 +375,7 @@ namespace SCFT
       D.reinit (sparsity_pattern);
       Xnp1.reinit (dof_handler.n_dofs ());
       Xn.reinit (dof_handler.n_dofs ());
+      yita_full_2D.reinit (dof_handler.n_dofs ());
       system_rhs.reinit (dof_handler.n_dofs ());
       N = triangulation.n_active_cells () + 1;
       n_dof = dof_handler.n_dofs ();
