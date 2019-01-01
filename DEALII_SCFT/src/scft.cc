@@ -10,6 +10,9 @@
 #include <vector>
 #include <fstream>
 
+template class std::vector<dealii::Point<2>>;
+//explicit instantiation for debug purpose
+
 namespace SCFT
 {
   template<int dim>
@@ -18,14 +21,13 @@ namespace SCFT
 	fe (1), dof_handler (triangulation), tau (tau), time (0.0), time_step (
 	    1. / (total_time_step - 1)), timestep_number (0), N (N), total_time_step (
 	    total_time_step), n_dof (dof_handler.n_dofs ()), L (L), refine_times (
-	    0)
+	    0), iteration (0)
     {
       time_step = 1. / (total_time_step - 1);
       solution_store = Matcreate (N + 1, total_time_step + 1);
       f0.reinit (N);
       yita_middle_1D = NULL;
       yita_full_1D.reinit (N);
-      yita_full_2D.reinit (2 * N);
       out.reinit (N);
       f0_given.reinit (N);
       local_iteration = 0;
@@ -57,7 +59,7 @@ namespace SCFT
       yita_full_2D = other.yita_full_2D;
       local_iteration = other.local_iteration;
       out = other.out;
-
+      iteration = other.iteration;
       return *this;
     }
 
@@ -131,9 +133,9 @@ namespace SCFT
     {
 #undef float
       Vector<float> estimated_error_per_cell (triangulation.n_active_cells ());
-      Vector<double> yita_full_2D_t (N * 2);
+      Vector<double> yita_full_2D_t (dof_handler.n_dofs ());
 
-      for (int i = 0; i < 2 * N; i++)
+      for (unsigned int i = 0; i < yita_full_2D.size (); i++)
 	yita_full_2D_t[i] = yita_full_2D[i];
 
       KellyErrorEstimator<dim>::estimate (dof_handler,
@@ -143,8 +145,8 @@ namespace SCFT
 					  estimated_error_per_cell);
 #define float double
 
-      //      GridRefinement::refine_and_coarsen_fixed_fraction (
-      //	  triangulation, estimated_error_per_cell, 1., 0.0);
+//      GridRefinement::refine_and_coarsen_fixed_fraction (
+//	  triangulation, estimated_error_per_cell, 1., 0.0);
       GridRefinement::refine (triangulation, estimated_error_per_cell, 0.50,
 			      200);
       typename DoFHandler<dim>::active_cell_iterator cell =
@@ -174,19 +176,15 @@ namespace SCFT
     {
       time = 0.;
       timestep_number = 0;
-//      N = triangulation.n_active_cells () + 1;
-//      n_dof = dof_handler.n_dofs ();
       printf ("N=%d  \n", N);
       Matfree (solution_store);
       solution_store = Matcreate (N + 1, total_time_step + 1);
       f0.reinit (N);
       yita_full_1D.reinit (N);
-      yita_full_2D.reinit (2 * N);
       out.reinit (N);
-      solution_table_1D_to_2D.clear ();
-      solution_table_2D_to_1D.clear ();
-      solution_table_x_to_2D.clear ();
-      solution_table_2D_to_x.clear ();
+      lookup_table_1D_to_2D.clear ();
+      lookup_table_2D_to_1D.clear ();
+      iteration = 0;
     }
 
   template<int dim>
@@ -275,6 +273,87 @@ namespace SCFT
 
   template<int dim>
     void
+    HeatEquation<dim>::set_yita_full_2D ()
+    {
+      std::vector<double> x;
+      get_x (x);
+      x.pop_back (); // remove the last and the first elements
+      x.erase (x.begin ()); // yita_middle_1D si a double*
+
+      MappingQ1<dim> mapping;
+      std::vector<Point<dim> > support_points (dof_handler.n_dofs ());
+      DoFTools::map_dofs_to_support_points<dim> (mapping, dof_handler,
+						 support_points);
+      double* xp = (double*) malloc (sizeof(double) * support_points.size ());
+      double* yp = (double*) malloc (sizeof(double) * support_points.size ());
+      for (unsigned int i = 0; i < support_points.size (); i++)
+	{
+	  xp[i] = support_points[i] (0);
+	}
+
+      double m = 0.;
+      spline_chen (&x[0], yita_middle_1D, xp, yp, x.size (),
+		   support_points.size (), &m);
+
+//      for (int i = 0; i < support_points.size (); i++)
+//	printf ("%2.15f\n", yp[i]);
+
+      for (unsigned int i = 0; i < support_points.size (); i++)
+	{
+	  yita_full_2D[i] = yp[i];
+	}
+
+      free (xp);
+      free (yp);
+
+//      int de;
+//      scanf ("%d", &de);
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::build_lookup_table ()
+    {
+      std::vector<double> x;
+      get_x (x);
+      std::vector<double> yita_full_1D_temp (N, 0.);
+      for (int i = 1; i < N - 1; i++)
+	yita_full_1D_temp[i] = yita_middle_1D[i - 1];
+
+      MappingQ1<dim> mapping;
+      std::vector<Point<dim> > support_points (dof_handler.n_dofs ());
+      DoFTools::map_dofs_to_support_points<dim> (mapping, dof_handler,
+						 support_points);
+      double px;
+      for (unsigned int i = 0; i < support_points.size (); i++)
+	{
+	  px = support_points[i] (0);
+	  int index = std::lower_bound (x.begin (), x.end (), px) - x.begin ();
+	  lookup_table_1D_to_2D.insert (std::pair<int, int> (index, i));
+	  lookup_table_2D_to_1D.insert (std::pair<int, int> (i, index));
+	}
+
+      /* print lookup tables */
+//      printf("lookup_table_1D_to_2D:\n");
+//      for (auto itr = lookup_table_1D_to_2D.begin ();
+//	  itr != lookup_table_1D_to_2D.end (); ++itr)
+//	{
+//	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
+//	}
+//      std::cout << std::endl;
+//      printf("lookup_table_2D_to_1D:\n");
+//      for (auto itr = lookup_table_2D_to_1D.begin ();
+//	  itr != lookup_table_2D_to_1D.end (); ++itr)
+//	{
+//	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
+//	}
+//      std::cout << std::endl;
+//      int de;
+//      scanf("%d",&de);
+    }
+
+  template<int dim>
+    void
     HeatEquation<dim>::setup_system ()
     {
       dof_handler.distribute_dofs (fe);
@@ -296,6 +375,7 @@ namespace SCFT
       D.reinit (sparsity_pattern);
       Xnp1.reinit (dof_handler.n_dofs ());
       Xn.reinit (dof_handler.n_dofs ());
+      yita_full_2D.reinit (dof_handler.n_dofs ());
       system_rhs.reinit (dof_handler.n_dofs ());
       N = triangulation.n_active_cells () + 1;
       n_dof = dof_handler.n_dofs ();
@@ -325,7 +405,6 @@ namespace SCFT
 
       get_f0_given ();
       update_internal_data ();
-      build_solution_table ();
     }
 
   template<int dim>
@@ -347,13 +426,15 @@ namespace SCFT
 						constraint_matrix);
       constraint_matrix.close ();
 
-//      MatrixCreator::create_mass_matrix (dof_handler,
-//					 QGauss<dim> (fe.degree + 1), A);
+      //      MatrixCreator::create_mass_matrix (dof_handler,
+      //					 QGauss<dim> (fe.degree + 1), A);
       const QGauss<dim> quadrature_formula (fe.degree + 1);
 
       FEValues<dim> fe_values (
-	  fe, quadrature_formula,
-	  update_values | update_gradients | update_JxW_values);
+	  fe,
+	  quadrature_formula,
+	  update_values | update_gradients | update_JxW_values
+	      | update_quadrature_points);
 
       const unsigned int dofs_per_cell = fe.dofs_per_cell;
       const unsigned int n_q_points = quadrature_formula.size ();
@@ -367,11 +448,17 @@ namespace SCFT
       DoFHandler<2>::active_cell_iterator cell = dof_handler.begin_active (),
 	  endc = dof_handler.end ();
 
+      std::vector<double> old_solution_values (quadrature_formula.size ());
       for (; cell != endc; ++cell)
 	{
 	  cell_A = 0.;
 	  cell_B = 0.;
+	  cell_C = 0.;
 	  fe_values.reinit (cell);
+	  fe_values.get_function_values (yita_full_2D, old_solution_values);
+
+//	std::vector<Point<dim> > qpositions(10);
+//	qpositions=fe_values.get_quadrature_points();
 
 	  for (unsigned int q_point = 0; q_point < n_q_points; ++q_point)
 	    for (unsigned int i = 0; i < dofs_per_cell; ++i)
@@ -383,6 +470,9 @@ namespace SCFT
 		  cell_B (i, j) += fe_values.shape_grad (i, q_point)
 		      * fe_values.shape_grad (j, q_point)
 		      * fe_values.JxW (q_point);
+		  cell_C (i, j) += fe_values.shape_value (i, q_point)
+		      * fe_values.shape_value (j, q_point)
+		      * old_solution_values[q_point] * fe_values.JxW (q_point);
 		}
 
 	  cell->get_dof_indices (local_dof_indices);
@@ -391,28 +481,10 @@ namespace SCFT
 							local_dof_indices, A);
 	  constraint_matrix.distribute_local_to_global (cell_B,
 							local_dof_indices, B);
+	  constraint_matrix.distribute_local_to_global (cell_C,
+							local_dof_indices, C);
 	}
 
-      std::vector<double> yita_full_1D (N, 0.);
-      for (int i = 0; i < N - 2; i++)
-	yita_full_1D[i + 1] = yita_middle_1D[i];
-      for (int i = 0; i < 2 * N; i++)
-	{
-	  int j = solution_table_2D_to_1D.find (i)->second;
-	  yita_full_2D[i] = yita_full_1D[j];
-	}
-      C.copy_from (A);
-      for (unsigned int i = 0; i < C.m (); i++)
-	{
-	  SparseMatrix<double>::iterator begin = C.begin (i), end = C.end (i);
-	  for (; begin != end; ++begin)
-	    {
-	      const dealii::SparseMatrixIterators::Accessor<double, false> acc =
-		  *begin;
-//	      std::cout << acc.row () << "  " << acc.column () << std::endl;
-	      acc.value () *= yita_full_2D[i];
-	    }
-	}
       D.copy_from (B);
       D.add (1., C);
 
@@ -468,113 +540,7 @@ namespace SCFT
       printf ("%s is written \n", filename.c_str ());
     }
 
-  template<int dim>
-    void
-    HeatEquation<dim>::build_solution_table ()
-    {
-
-      Point<dim> P;
-      std::vector<types::global_dof_index> loc_dof_indices (fe.dofs_per_cell);
-      typename DoFHandler<dim>::active_cell_iterator cell =
-	  dof_handler.begin_active (), endc = dof_handler.end ();
-      for (cell = dof_handler.begin_active (); cell != endc; cell++)
-	{
-	  cell->get_dof_indices (loc_dof_indices);
-	  for (unsigned int i = 0; i < fe.dofs_per_cell; i++)
-	    {
-	      P = cell->vertex (i);
-	      if (P (1) == 0)
-		{
-		  //		  std::cout << P (0) << "=" << loc_dof_indices[i] << std::endl;
-		  solution_table_x_to_2D.insert (
-		      std::pair<double, int> (P (0), loc_dof_indices[i]));
-		}
-	    }
-	}
-      int ii = 0;
-      for (auto itr = solution_table_x_to_2D.begin ();
-	  itr != solution_table_x_to_2D.end (); ++itr)
-	{
-	  solution_table_1D_to_2D.insert (
-	      std::pair<int, int> (ii, itr->second));
-	  ii++;
-	}
-
-      // Now build table_x_to_1D
-      std::map<double, int> solution_table_x_to_1D;
-      std::vector<double> x;
-      x.resize (get_N ());
-      get_x (x);
-      for (unsigned int i = 0; i < x.size (); i++)
-	{
-	  solution_table_x_to_1D.insert (std::pair<double, int> (x[i], i));
-	}
-
-      for (cell = dof_handler.begin_active (); cell != endc; cell++)
-	{
-	  cell->get_dof_indices (loc_dof_indices);
-	  for (unsigned int i = 0; i < fe.dofs_per_cell; i++)
-	    {
-	      P = cell->vertex (i);
-	      solution_table_2D_to_x.insert (
-		  std::pair<int, double> (loc_dof_indices[i], P (0)));
-	    }
-	}
-
-      for (int i = 0; i < 2 * N; i++)
-	{
-	  double x = solution_table_2D_to_x.find (i)->second;
-	  solution_table_2D_to_1D.insert (
-	      std::pair<int, int> (i, solution_table_x_to_1D.find (x)->second));
-	}
-
-      //      printf ("print Table: \n");
-      //
-      //      printf ("N=%d \n", get_N ());
-      //      printf ("solution_table_x_to_2D\n");
-      //      for (auto itr = solution_table_x_to_2D.begin ();
-      //	  itr != solution_table_x_to_2D.end (); ++itr)
-      //	{
-      //	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
-      //	}
-      //      std::cout << std::endl;
-      //
-      //      printf ("solution_table_2D_to_x\n");
-      //      for (auto itr = solution_table_2D_to_x.begin ();
-      //	  itr != solution_table_2D_to_x.end (); ++itr)
-      //	{
-      //	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
-      //	}
-      //      std::cout << std::endl;
-      //
-      //      printf ("solution_table_1D_to_2D\n");
-      //      for (auto itr = solution_table_1D_to_2D.begin ();
-      //	  itr != solution_table_1D_to_2D.end (); ++itr)
-      //	{
-      //	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
-      //	}
-      //      std::cout << std::endl;
-      //
-      //      printf ("solution_table_2D_to_1D\n");
-      //      for (auto itr = solution_table_2D_to_1D.begin ();
-      //	  itr != solution_table_2D_to_1D.end (); ++itr)
-      //	{
-      //	  std::cout << '\t' << itr->first << "---" << itr->second << '\n';
-      //	}
-      //      std::cout << std::endl;
-      //
-      //      for (cell = dof_handler.begin_active (); cell != endc; cell++)
-      //	{
-      //	  cell->get_dof_indices (loc_dof_indices);
-      //	  for (int i = 0; i < fe.dofs_per_cell; i++)
-      //	    {
-      //	      P = cell->vertex (i);
-      //	      std::cout << P << "->" << loc_dof_indices[i] << std::endl;
-      //	    }
-      //	}
-      //      scanf ("%d", &de);
-    }
-
   template class HeatEquation<2> ;
   template class HeatEquation<3> ;
+
 }

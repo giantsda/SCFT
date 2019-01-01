@@ -88,7 +88,12 @@ namespace SCFT
       void
       output_mesh ();
       void
+      set_yita_full_2D (); // use cubic spline interpotation
+      void
+      build_lookup_table ();
+      void
       print_and_save_yita_1D (std::vector<double> solution);
+
     private:
       void
       setup_system ();
@@ -98,8 +103,6 @@ namespace SCFT
       solve_time_step ();
       void
       output_results () const;
-      void
-      build_solution_table ();
 
     private:
       // private data
@@ -120,7 +123,7 @@ namespace SCFT
       Vector<double> Xnp1;
       Vector<double> Xn;
       Vector<double> system_rhs;
-      Vector<double> solutionBlock, systemRhsBlock,tmp;
+      Vector<double> solutionBlock, systemRhsBlock, tmp;
 
       double tau;
       double time;
@@ -137,11 +140,10 @@ namespace SCFT
       Vector<double> out;
       Vector<double> f0_given;
       int refine_times;
-      std::map<int, int> solution_table_1D_to_2D;
-      std::map<int, int> solution_table_2D_to_1D;
-      std::map<double, int> solution_table_x_to_2D;
-      std::map<int, double> solution_table_2D_to_x;
+      std::map<int, int> lookup_table_1D_to_2D;
+      std::map<int, int> lookup_table_2D_to_1D;
       SparseDirectUMFPACK A_direct;
+      int iteration;
     };
 
 }

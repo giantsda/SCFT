@@ -15,7 +15,7 @@ spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
 /* x,y is the table waiting to be interpolated.
  x from [0 Nx];
  xp is the x vector you want to know yp at.
- is m==NULL use not-a-knot end condition
+ if m==NULL use not-a-knot end condition
  m=0 for natural spline;
  otherwise m is the ddy at boundarys
  */
@@ -42,6 +42,13 @@ spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
 
   if (m == NULL) // use not-a-knot
     {
+
+      if (Nx <= 3)
+	{
+	  printf (
+	      "spline_chen:To use not-a-knot end condition, more than 3 x-y should be provided!\n");
+	  exit (-1);
+	}
       A[1][1] = 1 / (x[1] - x[0]);
       A[1][2] = -1 / (x[1] - x[0]) - 1 / (x[2] - x[1]);
       A[1][3] = 1 / (x[2] - x[1]);

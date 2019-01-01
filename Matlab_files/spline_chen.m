@@ -14,6 +14,9 @@ end
 
 %% not-a-knot end condition
 if (nargin==3)
+    if Nx<=3
+         error('spline_chen:To use not-a-knot end condition, more than 3 x-y should be provided!\n');
+    end
     A(1,1:3)=[1/(x(2)-x(1)) -1/(x(2)-x(1))-1/(x(3)-x(2)) 1/(x(3)-x(2))];
     A(Nx,Nx-2:Nx)=[1/(x(Nx-1)-x(Nx-2)) -1/(x(Nx-1)-x(Nx-2))-1/(x(Nx)-x(Nx-1)) 1/(x(Nx)-x(Nx-1))];
     b(1)=0;
@@ -37,7 +40,7 @@ end
 X=A\b; % X is the solution of ddy at each point of x;
 
 yp=zeros(Nxp,1);
-for i=1:Nxp
+for i=1:Nxp 
     klo=1;
     khi=Nx;
     while ((khi-klo)>1)
