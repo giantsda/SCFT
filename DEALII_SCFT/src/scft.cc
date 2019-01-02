@@ -21,7 +21,7 @@ namespace SCFT
 	fe (1), dof_handler (triangulation), tau (tau), time (0.0), time_step (
 	    1. / (total_time_step - 1)), timestep_number (0), N (N), total_time_step (
 	    total_time_step), n_dof (dof_handler.n_dofs ()), L (L), refine_times (
-	    0), iteration (0),mean_field_free_energy(0.0)
+	    0), iteration (0), mean_field_free_energy (0.0)
     {
       time_step = 1. / (total_time_step - 1);
       solution_store = Matcreate (N + 1, total_time_step + 1);
@@ -133,15 +133,11 @@ namespace SCFT
     {
 #undef float
       Vector<float> estimated_error_per_cell (triangulation.n_active_cells ());
-      Vector<double> yita_full_2D_t (dof_handler.n_dofs ());
-
-      for (unsigned int i = 0; i < yita_full_2D.size (); i++)
-	yita_full_2D_t[i] = yita_full_2D[i];
 
       KellyErrorEstimator<dim>::estimate (dof_handler,
 					  QGauss<dim - 1> (fe.degree + 1),
 					  typename FunctionMap<dim>::type (),
-					  yita_full_2D_t,
+					  yita_full_2D,
 					  estimated_error_per_cell);
 #define float double
 
@@ -154,8 +150,8 @@ namespace SCFT
 
       for (cell = dof_handler.begin_active (); cell != endc; ++cell)
 	{
-	  if (cell->refine_flag_set ())
-	    cell->set_refine_flag (RefinementCase<dim>::cut_axis (0));
+//	  if (cell->refine_flag_set ())
+	  cell->set_refine_flag (RefinementCase<dim>::cut_axis (0));
 	}
 
       std::vector<double> x, xp;
@@ -247,30 +243,38 @@ namespace SCFT
 
   template<int dim>
     void
-    HeatEquation<dim>::print_and_save_yita_1D (std::vector<double> solution)
+    HeatEquation<dim>::print_and_save_yita_1D ()
     {
-      printf ("Solved ! \n middle_solution: N=%d \n", get_N ());
+      printf ("Solved ! \n Full_1D_solution: N=%d \n", get_N ());
       set_mean_field_free_energy ();
 
       // print and write  solution;
       std::vector<double> x;
       get_x (x);
       FILE * fp;
-      char filename[64], num[64];
-      sprintf (num, "%d", get_N ());
-      strcpy (filename, "solution_yita_1D_N= ");
-      strcat (filename, num);
-      strcat (filename, ".txt");
 
-      fp = fopen (filename, "w+");
+      const std::string filename = "solution_yita_1D_N="
+	  + Utilities::int_to_string (get_N (), 3) + ".txt";
+
+      fp = fopen (filename.c_str (), "w+");
       fprintf (fp, "N= %d \n", get_N ());
-      for (unsigned int i = 0; i < solution.size (); i++)
+//      for (unsigned int i = 0; i < solution.size (); i++)
+//	{
+//	  printf ("solution[%d]=%2.15f \n", i, solution[i]);
+//	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i], solution[i]);
+//	}
+
+      for (unsigned int i = 0; i < N; i++)
 	{
-	  printf ("solution[%d]=%2.15f \n", i, solution[i]);
-	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i], solution[i]);
+	  printf ("solution[%d]=%2.15f \n", i,
+		  yita_full_2D[lookup_table_1D_to_2D.find (i)->second]);
+	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i],
+		   yita_full_2D[lookup_table_1D_to_2D.find (i)->second]);
 	}
+
       printf ("mean_field_free_energy=%2.15f \n", mean_field_free_energy);
-      fprintf (fp,"mean_field_free_energy, %2.15f \n", mean_field_free_energy);
+      fprintf (fp, "mean_field_free_energy, %2.15f \n", mean_field_free_energy);
+
       fclose (fp);
       printf ("%s is written. \n", filename);
     }
@@ -287,7 +291,7 @@ namespace SCFT
     HeatEquation<dim>::set_mean_field_free_energy ()
     {
       const QGauss<dim> quadrature_formula (fe.degree + 1);
-      mean_field_free_energy=0.;
+      mean_field_free_energy = 0.;
       FEValues<dim> fe_values (
 	  fe,
 	  quadrature_formula,
@@ -300,6 +304,7 @@ namespace SCFT
       std::vector<Point<dim> > quadrature (n_q_points);
       std::vector<double> solution_values (quadrature_formula.size ());
       double x, fi;
+      double y = L / 33;
       MappingQ1<dim> mapping;
       for (; cell != endc; ++cell)
 	{
@@ -323,11 +328,13 @@ namespace SCFT
 	      else
 		fi = 1.;
 //			printf("fi=%2.15f when x = %2.15f ,p[0]=%2.15f\n", fi, x, p[0]);
+
 	      mean_field_free_energy += solution_values[q_point] * fi
 		  * fe_values.JxW (q_point);
 	    }
 	}
 
+      mean_field_free_energy = mean_field_free_energy / y; // Do I need it?
       double sum = 0;
       for (unsigned int i = 0; i < f0_given.size (); i++)
 	{

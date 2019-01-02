@@ -92,7 +92,7 @@ namespace SCFT
       void
       build_lookup_table ();
       void
-      print_and_save_yita_1D (std::vector<double> solution);
+      print_and_save_yita_1D ();
       double
       get_L ();
       void

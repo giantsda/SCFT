@@ -100,7 +100,7 @@ template<int dim>
 	  {
 	    GridIn<dim> grid_in;
 	    grid_in.attach_triangulation (triangulation);
-	    std::ifstream input_file ("yita_full_2D_N=043.msh");
+	    std::ifstream input_file ("yita_full_2D_N=127.msh");
 	    Assert(dim == 2, ExcInternalError ());
 	    grid_in.read_msh (input_file);
 	  }
@@ -240,8 +240,7 @@ main ()
       int N;
       std::vector<double> x_old; // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
       double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
-      read_yita_middle_1D (x_old, "inputFiles/N=33_for_read.txt", N); // read data from file, also set N;
-      N = 33;
+      read_yita_middle_1D (x_old, "inputFiles/N=33_for_read.txt", N); // read data from file, also set N; inputFiles/N=33_for_read.txt
       HeatEquation<2> other (tau, N, 2049, L); /* 2049 are points, 2048 intervals */
       heat_equation_solver = other; // I need this global class to do stuffs
       std::vector<double> interpolated_solution_yita_1D;
@@ -262,14 +261,15 @@ main ()
       err = 0.00000001;
 #endif
 
-      for (int i = 0; i < 20; i++)
+      for (int i = 0; i < 10; i++)
 	{
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-1, 200, N - 2, 0.99, 2);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-3, 300, N - 2, 0.9, 3);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 800, N - 2, 0.9, 15);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.9, 30);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.9, 50);
 	  //	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
-	  heat_equation_solver.print_and_save_yita_1D (x_old);
+	  heat_equation_solver.print_and_save_yita_1D ();
 	  heat_equation_solver.output_results_for_yita_full_2D ();
 	  heat_equation_solver.output_mesh ();
 	  heat_equation_solver.refine_mesh (x_old,
