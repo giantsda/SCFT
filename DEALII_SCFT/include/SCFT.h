@@ -93,7 +93,10 @@ namespace SCFT
       build_lookup_table ();
       void
       print_and_save_yita_1D (std::vector<double> solution);
-
+      double
+      get_L ();
+      double
+      get_mean_field_free_energy();
     private:
       void
       setup_system ();
