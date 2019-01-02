@@ -43,9 +43,9 @@
                             							
                             <tool id="cdt.managedbuild.tool.gnu.cpp.compiler.base.975255992" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.base">
                                 								
-                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.cpp.compiler.option.include.paths.604221203" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.cpp.compiler.option.include.paths.604221203" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
                                     									
-                                    <listOptionValue builtIn="false" value="/home/chen/Desktop/software/dealii-9.0.1/install/include"/>
+                                    <listOptionValue builtIn="false" value="/home/chen/Desktop/software/dealii-9.0.0/install/include"/>
                                     									
                                     <listOptionValue builtIn="false" value="/home/chen/Desktop/project/SCFT/DEALII_SCFT/include"/>
                                     								
@@ -57,11 +57,13 @@
                             							
                             <tool id="cdt.managedbuild.tool.gnu.c.compiler.base.1901421849" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.base">
                                 								
-                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.c.compiler.option.include.paths.719249226" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.c.compiler.option.include.paths.719249226" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
                                     									
                                     <listOptionValue builtIn="false" value="/home/chen/Desktop/software/dealii-9.0.1/install/include"/>
                                     									
                                     <listOptionValue builtIn="false" value="/home/chen/Desktop/project/SCFT/DEALII_SCFT/include"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="/home/chen/Desktop/software/dealii-9.0.0/install/include"/>
                                     								
                                 </option>
                                 								
@@ -85,11 +87,13 @@
                             							
                             <tool id="cdt.managedbuild.tool.gnu.assembler.base.1187159665" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.base">
                                 								
-                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.both.asm.option.include.paths.174394273" superClass="gnu.both.asm.option.include.paths" valueType="includePath">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.both.asm.option.include.paths.174394273" name="Include paths (-I)" superClass="gnu.both.asm.option.include.paths" valueType="includePath">
                                     									
                                     <listOptionValue builtIn="false" value="/home/chen/Desktop/software/dealii-9.0.1/install/include"/>
                                     									
                                     <listOptionValue builtIn="false" value="/home/chen/Desktop/project/SCFT/DEALII_SCFT/include"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="/home/chen/Desktop/software/dealii-9.0.0/install/include"/>
                                     								
                                 </option>
                                 								
@@ -113,7 +117,7 @@
     	
     <storageModule moduleId="cdtBuildSystem" version="4.0.0">
         		
-        <project id="DEALII_SCFT.null.972599000" name="DEALII_SCFT"/>
+        <project id="DEALII_SCFT.null.57649059" name="DEALII_SCFT"/>
         	
     </storageModule>
     	

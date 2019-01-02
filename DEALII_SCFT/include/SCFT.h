@@ -95,8 +95,8 @@ namespace SCFT
       print_and_save_yita_1D (std::vector<double> solution);
       double
       get_L ();
-      double
-      get_mean_field_free_energy();
+      void
+      set_mean_field_free_energy();
     private:
       void
       setup_system ();
@@ -147,6 +147,7 @@ namespace SCFT
       std::map<int, int> lookup_table_2D_to_1D;
       SparseDirectUMFPACK A_direct;
       int iteration;
+      double mean_field_free_energy;
     };
 
 }
