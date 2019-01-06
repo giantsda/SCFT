@@ -21,7 +21,6 @@ spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
  */
 {
   double** A = dmatrix (1, Nx, 1, Nx); // NR requires it 1 based.
-
   double** B = dmatrix (1, Nx, 1, 1);
 
   for (int i = 1; i < Nx + 1; i++)  // initialize A and b
@@ -100,5 +99,9 @@ spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
 	      * (h * h) / 6.0;
 
     }
+
+  free_matrix (A, 1, Nx, 1, Nx);
+  free_matrix (B, 1, Nx, 1, 1);
+
 }
 

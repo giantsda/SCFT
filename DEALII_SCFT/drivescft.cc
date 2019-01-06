@@ -68,8 +68,8 @@ namespace dealii
 				   const unsigned int component) const
     {
       (void) component;
-      Assert(component == 0, ExcIndexRange (component, 0, 1));
-      Assert(dim == 2, ExcNotImplemented ());
+      Assert (component == 0, ExcIndexRange (component, 0, 1));
+      Assert (dim == 2, ExcNotImplemented ());
       if (p[0] == 0. || p[0] == heat_equation_solver.get_L ())
 	return 0.;
       else
@@ -92,16 +92,16 @@ template<int dim>
 	    repetitions.push_back (1);
 	    GridGenerator::subdivided_hyper_rectangle (triangulation,
 						       repetitions,
-						       Point<2> (0.0, 0.0),
-						       Point<2> (L, L / N),
+						       Point < 2 > (0.0, 0.0),
+						       Point < 2 > (L, L / N),
 						       true);
 	  }
 	else
 	  {
-	    GridIn<dim> grid_in;
+	    GridIn < dim > grid_in;
 	    grid_in.attach_triangulation (triangulation);
-	    std::ifstream input_file ("yita_full_2D_N=127.msh");
-	    Assert(dim == 2, ExcInternalError ());
+	    std::ifstream input_file ("yita_full_2D_N=033.msh");
+	    Assert (dim == 2, ExcInternalError ());
 	    grid_in.read_msh (input_file);
 	  }
 	setup_system (); // The first time, the triangulation is generated and system is set up. The
@@ -153,17 +153,20 @@ template<int dim>
       }
 
     /* write solution; */
-//      {
-//	FILE * fp;
-//	fp = fopen ("solution_store.txt", "w+");
-//	for (int i = 0; i < N + 1; i++)
-//	  {
-//	    for (int j = 0; j < total_time_step; j++)
-//	      fprintf (fp, "%2.15f,", solution_store[i][j]);
-//	    fprintf (fp, "\n");
-//	  }
-//	fclose (fp);
-//      }
+    int write = 0;
+
+    if (write)
+      {
+	FILE * fp;
+	fp = fopen ("solution_store.txt", "w+");
+	for (int i = 0; i < N + 1; i++)
+	  {
+	    for (int j = 0; j < total_time_step; j++)
+	      fprintf (fp, "%2.15f,", solution_store[i][j]);
+	    fprintf (fp, "\n");
+	  }
+	fclose (fp);
+      }
 //    scanf ("%d", &de);
     /*   integrate for f0 use romint   */
     double v_for_romint[total_time_step];
@@ -172,11 +175,21 @@ template<int dim>
 	for (int j = 0; j < total_time_step; j++)
 	  {
 	    v_for_romint[j] = solution_store[i + 1][j]
-		* solution_store[i + 1][total_time_step - j];
+		* solution_store[i + 1][total_time_step - 1 - j];
 	  }
-	f0[i] = romint (v_for_romint, total_time_step,
+	f0[i] = romint (v_for_romint, total_time_step - 1,
 			1. / (total_time_step - 1));
-	//	  printf ("f0[%d]=%2.15f\n", i, f0[i]);
+	if (std::isnan (f0[i]))
+	  {
+	    printf ("Got an NAN from romint(): f0[%d]=%2.15f\n", i, f0[i]);
+	    for (int k = 0; k < total_time_step; k++)
+	      printf ("v_for_romint[%d]=%2.15f\n", k, v_for_romint[k]);
+	    printf ("solution_store[%d][0]=%f\n", i + 1,
+		    solution_store[i + 1][0]);
+	    printf ("solution_store[%d][%d]=%f\n", i + 1, total_time_step - 0,
+		    solution_store[i + 1][total_time_step - 0]);
+	    exit (-1);
+	  }
       }
     //      scanf ("%d", &de);
 
@@ -267,7 +280,7 @@ main ()
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-3, 300, N - 2, 0.9, 3);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 800, N - 2, 0.9, 15);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.9, 30);
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.9, 50);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 10000, N - 2, 0.1, 50);
 	  //	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
 	  heat_equation_solver.print_and_save_yita_1D ();
 	  heat_equation_solver.output_results_for_yita_full_2D ();

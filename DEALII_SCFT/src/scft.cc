@@ -53,7 +53,7 @@ namespace SCFT
       total_time_step = other.total_time_step;
       L = other.L;
       time_step = 1. / (total_time_step - 1);
-      solution_store = Matcreate (N + 1, total_time_step + 1);
+      solution_store = Matcreate (N + 1, total_time_step);
       f0 = other.f0;
       yita_full_1D = other.yita_full_1D; //TODO: make sure it is notdeep copy
       yita_full_2D = other.yita_full_2D;
@@ -264,7 +264,7 @@ namespace SCFT
 //	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i], solution[i]);
 //	}
 
-      for (unsigned int i = 0; i < N; i++)
+      for (int i = 0; i < N; i++)
 	{
 	  printf ("solution[%d]=%2.15f \n", i,
 		  yita_full_2D[lookup_table_1D_to_2D.find (i)->second]);
@@ -276,7 +276,7 @@ namespace SCFT
       fprintf (fp, "mean_field_free_energy, %2.15f \n", mean_field_free_energy);
 
       fclose (fp);
-      printf ("%s is written. \n", filename);
+      printf ("%s is written. \n", filename.c_str());
     }
 
   template<int dim>
