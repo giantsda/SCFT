@@ -276,7 +276,7 @@ namespace SCFT
       fprintf (fp, "mean_field_free_energy, %2.15f \n", mean_field_free_energy);
 
       fclose (fp);
-      printf ("%s is written. \n", filename.c_str());
+      printf ("%s is written. \n", filename.c_str ());
     }
 
   template<int dim>
@@ -305,6 +305,8 @@ namespace SCFT
       std::vector<double> solution_values (quadrature_formula.size ());
       double x, fi;
       double y = L / 33;
+      double f0Bar = 0.161138909231016; // calculated from romint, use testFiBar.cc tp calculate it.
+
       MappingQ1<dim> mapping;
       for (; cell != endc; ++cell)
 	{
@@ -334,17 +336,9 @@ namespace SCFT
 	    }
 	}
 
-      mean_field_free_energy = mean_field_free_energy / y; // Do I need it?
-      double sum = 0;
-      for (unsigned int i = 0; i < f0_given.size (); i++)
-	{
-	  sum += f0_given[i];
-	}
-
-      double f0_given_bar = sum / N;
-//	printf("f0_given_bar=%2.15f \n", f0_given_bar);
-      mean_field_free_energy = (mean_field_free_energy / f0_given_bar / L
-	  + log (f0_given_bar)) / (-N);
+      mean_field_free_energy = mean_field_free_energy / y; // Do I need it, yes
+      mean_field_free_energy =
+	  (mean_field_free_energy / f0Bar / L + log (f0Bar)) / (-1000.);
     }
 
   template<int dim>
