@@ -24,7 +24,7 @@ namespace SCFT
 	    0), iteration (0), mean_field_free_energy (0.0)
     {
       time_step = 1. / (total_time_step - 1);
-      solution_store = Matcreate (N + 1, total_time_step + 1);
+      solution_store = Matcreate (N + 1, total_time_step);
       f0.reinit (N);
       yita_middle_1D = NULL;
       yita_full_1D.reinit (N);
@@ -257,6 +257,11 @@ namespace SCFT
 	  + Utilities::int_to_string (get_N (), 3) + ".txt";
 
       fp = fopen (filename.c_str (), "w+");
+      if (fp == NULL)
+	{
+	  printf ("cannot create file %s \n;", filename.c_str ());
+	  exit (-1);
+	}
       fprintf (fp, "N= %d \n", get_N ());
 //      for (unsigned int i = 0; i < solution.size (); i++)
 //	{

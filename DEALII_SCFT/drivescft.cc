@@ -44,6 +44,7 @@
 
 //#define BROYDN
 
+//#define CHECK;
 int de; // My debug varaibe
 
 SCFT::HeatEquation<2> heat_equation_solver;
@@ -68,8 +69,8 @@ namespace dealii
 				   const unsigned int component) const
     {
       (void) component;
-      Assert (component == 0, ExcIndexRange (component, 0, 1));
-      Assert (dim == 2, ExcNotImplemented ());
+      Assert(component == 0, ExcIndexRange (component, 0, 1));
+      Assert(dim == 2, ExcNotImplemented ());
       if (p[0] == 0. || p[0] == heat_equation_solver.get_L ())
 	return 0.;
       else
@@ -92,16 +93,16 @@ template<int dim>
 	    repetitions.push_back (1);
 	    GridGenerator::subdivided_hyper_rectangle (triangulation,
 						       repetitions,
-						       Point < 2 > (0.0, 0.0),
-						       Point < 2 > (L, L / N),
+						       Point<2> (0.0, 0.0),
+						       Point<2> (L, L / N),
 						       true);
 	  }
 	else
 	  {
-	    GridIn < dim > grid_in;
+	    GridIn<dim> grid_in;
 	    grid_in.attach_triangulation (triangulation);
 	    std::ifstream input_file ("yita_full_2D_N=033.msh");
-	    Assert (dim == 2, ExcInternalError ());
+	    Assert(dim == 2, ExcInternalError ());
 	    grid_in.read_msh (input_file);
 	  }
 	setup_system (); // The first time, the triangulation is generated and system is set up. The
@@ -122,6 +123,7 @@ template<int dim>
     for (int i = 2; i < N; i++)
       solution_store[i][0] = 1.;
     solution_store[0][0] = 0.;
+    solution_store[1][0] = 0.; // have to initialize it or it may be a NaN stored in it.
     solution_store[N][0] = 0.;
 
     time = 0.;
@@ -148,6 +150,16 @@ template<int dim>
 	  {
 	    solution_store[i + 1][timestep_number] =
 		Xnp1[lookup_table_1D_to_2D.find (i)->second];
+#ifdef CHECK
+	    if (std::isnan (solution_store[i + 1][timestep_number]))
+	      {
+		printf ("Got an NAN from solution_store:\n");
+		printf ("solution_store[%d][%d]=%2.15f\n", i + 1,
+			timestep_number,
+			solution_store[i + 1][timestep_number]);
+		exit (-1);
+	      }
+#endif
 	  }
 
       }
@@ -179,6 +191,7 @@ template<int dim>
 	  }
 	f0[i] = romint (v_for_romint, total_time_step - 1,
 			1. / (total_time_step - 1));
+#ifdef CHECK
 	if (std::isnan (f0[i]))
 	  {
 	    printf ("Got an NAN from romint(): f0[%d]=%2.15f\n", i, f0[i]);
@@ -190,6 +203,7 @@ template<int dim>
 		    solution_store[i + 1][total_time_step - 0]);
 	    exit (-1);
 	  }
+#endif
       }
     //      scanf ("%d", &de);
 
