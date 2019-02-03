@@ -285,7 +285,7 @@ main ()
       r = dmatrix (1, N - 2, 1, N - 2);
       d = dvector (1, N - 2);
       jc = 0;
-      err = 0.00000001;
+      err = 1e-7;
 #endif
 
       for (int i = 0; i < 10; i++)
@@ -294,7 +294,8 @@ main ()
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-3, 300, N - 2, 0.9, 3);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 800, N - 2, 0.9, 15);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.9, 30);
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 10000, N - 2, 0.1, 50);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.1, 50);
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 100000, N - 2, 0.001, 100);  // hope fully solve in this line.
 	  //	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
 	  heat_equation_solver.print_and_save_yita_1D ();
 	  heat_equation_solver.output_results_for_yita_full_2D ();

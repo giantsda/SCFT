@@ -18,6 +18,15 @@ for i=1:length(files)
     result{i}.mean_field_free_energy=mean_field_free_energy;
     fclose(fileID);
 end
+
+%% sort files based on N
+A=struct2cell(cell2mat(result));
+B=cell2mat(A(2,:).');
+[~, order] = sort(B);
+result = result(order, :)
+A=struct2cell(cell2mat(result));
+B=cell2mat(A(2,:).');
+
 mean_field_free_energy_s=[];
 for i=1:length(result)
     x=result{i}.x;
@@ -31,15 +40,8 @@ for i=1:length(result)
 end
 
 figure;
-plot (mean_field_free_energy_s,'*-');
-
-
-
-
-
-
-
-
-
-
-
+absDiff=abs(mean_field_free_energy_s-mean_field_free_energy_s(end));
+loglog (B,absDiff,'*-');
+title('|Fm-F1024|');
+xlabel('m')
+ 
