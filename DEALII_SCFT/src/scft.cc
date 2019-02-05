@@ -9,6 +9,7 @@
 #include "NR_chen.h"
 #include <vector>
 #include <fstream>
+#include <deal.II/numerics/fe_field_function.h>
 
 template class std::vector<dealii::Point<2>>;
 //explicit instantiation for debug purpose
@@ -248,12 +249,23 @@ namespace SCFT
       printf ("Solved ! \n Full_1D_solution: N=%d \n", get_N ());
       set_mean_field_free_energy ();
 
-      // print and write  solution;
-      std::vector<double> x;
-      get_x (x);
+      // get function value and nPlot points
+      int nPlot = 2000;
+      std::vector<Point<dim> > vP (nPlot);
+      for (unsigned int i = 0; i < 2000; i++)
+	{
+	  vP[i][0] = L * i / (nPlot - 1);
+	  vP[i][1] = 0.0;
+	}
+
+      std::vector<double> xx (nPlot);
+      Functions::FEFieldFunction < dim > fefunction (dof_handler, yita_full_2D);
+      fefunction.value_list (vP, xx);
+
       FILE * fp;
 
-      const std::string filename = "solution_yita_1D_N="
+      // write nPlot points solution
+      const std::string filename = "detailedsolution_yita_1D_N="
 	  + Utilities::int_to_string (get_N (), 3) + ".txt";
 
       fp = fopen (filename.c_str (), "w+");
@@ -263,12 +275,27 @@ namespace SCFT
 	  exit (-1);
 	}
       fprintf (fp, "N= %d \n", get_N ());
-//      for (unsigned int i = 0; i < solution.size (); i++)
-//	{
-//	  printf ("solution[%d]=%2.15f \n", i, solution[i]);
-//	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i], solution[i]);
-//	}
 
+      for (int i = 0; i < nPlot; i++)
+	{
+	  fprintf (fp, "%i,%2.15f,%2.15f\n", i, vP[i][0], xx[i]);
+	}
+      fclose (fp);
+
+      // print and write  solution;
+      std::vector<double> x;
+      get_x (x);
+
+      const std::string filename2 = "solution_yita_1D_N="
+	  + Utilities::int_to_string (get_N (), 3) + ".txt";
+
+      fp = fopen (filename2.c_str (), "w+");
+      if (fp == NULL)
+	{
+	  printf ("cannot create file %s \n;", filename.c_str ());
+	  exit (-1);
+	}
+      fprintf (fp, "N= %d \n", get_N ());
       for (int i = 0; i < N; i++)
 	{
 	  printf ("solution[%d]=%2.15f \n", i,
