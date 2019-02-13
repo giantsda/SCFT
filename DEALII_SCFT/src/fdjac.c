@@ -17,6 +17,7 @@ void fdjac(int n, float x[], float fvec[], float **df,
 	f=vector(1,n);
 	for (j=1;j<=n;j++)
 	{
+		printf ("Fdjac is calculating Jacobi  %2.2f %% \n",(j+0.0)/n*100);
 		temp=x[j];
 		h=EPS*temp;
 		if (fabs(h) < EPS)  h = SIGN(EPS,temp);
