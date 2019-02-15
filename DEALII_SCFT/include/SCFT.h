@@ -96,7 +96,12 @@ namespace SCFT
       double
       get_L ();
       void
-      set_mean_field_free_energy();
+      set_mean_field_free_energy ();
+      void
+      set_mean_field_free_energy_romint (
+	  int nPlot, std::vector<double> xp,
+	  std::vector<double> detailedSolutionYita1D);
+
     private:
       void
       setup_system ();

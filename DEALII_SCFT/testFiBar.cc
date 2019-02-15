@@ -12,8 +12,8 @@
 int
 main ()
 {
-  double tau = 0.5302, L = 3.72374;
-  int N = pow (2, 22) + 1;
+  double tau = 5.30252230020752e-01, L = 3.72374357332160;
+  int N = pow (2, 16) + 1;
   std::vector<double> f0_given;
 
   f0_given.resize (N);
@@ -23,7 +23,7 @@ main ()
   x.resize (N);
   for (int i = 0; i < N; i++)
     {
-      x[i] = 1. / (N - 1) * i;
+      x[i] = L / (N - 1) * i;
     }
 
   for (int i = 0; i < N; i++)
@@ -47,7 +47,7 @@ main ()
 //  for (int i = 0; i < N; i++)
 //    printf ("f0_given[%d]=%2.15f\n", i, f0_given[i]);
 
-  double f0Bar = romint (&f0_given[0], N - 1, 1. / (N - 1)) / L;
+  double f0Bar = romint (&f0_given[0], N - 1, L / (N - 1)) / L;
   printf ("f0Bar=%2.15f;N=%d\n", f0Bar, N);
 
   FILE *file;
@@ -104,9 +104,10 @@ main ()
       yita_middle[i] = yita_middle[i] * f0_given[i];
     }
 
-  double mean_field_free_energy = romint (&yita_middle[0], N - 1, 1. / (N - 1));
+  double mean_field_free_energy = romint (&yita_middle[0], N - 1, L / (N - 1));
 
-  mean_field_free_energy = (mean_field_free_energy / f0Bar / L + log (f0Bar)) / (-1000.);
+  mean_field_free_energy = (mean_field_free_energy / f0Bar / L + log (f0Bar))
+      / (-1000.);
   printf ("integration=%2.15f\n", mean_field_free_energy);
   fclose (file);
   return 0;

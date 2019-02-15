@@ -10,6 +10,8 @@
 #include <vector>
 #include <fstream>
 #include <deal.II/numerics/fe_field_function.h>
+#include "nrutil.h"
+#include "nr.h"
 
 template class std::vector<dealii::Point<2>>;
 //explicit instantiation for debug purpose
@@ -247,20 +249,19 @@ namespace SCFT
     HeatEquation<dim>::print_and_save_yita_1D ()
     {
       printf ("Solved ! \n Full_1D_solution: N=%d \n", get_N ());
-      set_mean_field_free_energy ();
 
       // get function value and nPlot points
       int nPlot = 2000;
-      std::vector<Point<dim> > vP (nPlot);
+      std::vector<Point<dim> > vP (nPlot); // stores location that I am interested
       for (unsigned int i = 0; i < 2000; i++)
 	{
 	  vP[i][0] = L * i / (nPlot - 1);
 	  vP[i][1] = 0.0;
 	}
 
-      std::vector<double> xx (nPlot);
-      Functions::FEFieldFunction < dim > fefunction (dof_handler, yita_full_2D);
-      fefunction.value_list (vP, xx);
+      std::vector<double> detailedSolutionYita1D (nPlot);
+      Functions::FEFieldFunction<dim> fefunction (dof_handler, yita_full_2D);
+      fefunction.value_list (vP, detailedSolutionYita1D);
 
       FILE * fp;
 
@@ -278,9 +279,20 @@ namespace SCFT
 
       for (int i = 0; i < nPlot; i++)
 	{
-	  fprintf (fp, "%i,%2.15f,%2.15f\n", i, vP[i][0], xx[i]);
+	  fprintf (fp, "%i,%2.15f,%2.15f\n", i, vP[i][0],
+		   detailedSolutionYita1D[i]);
 	}
       fclose (fp);
+
+      std::vector<double> xp (nPlot);
+
+      for (int i = 0; i < nPlot; i++)
+	{
+	  xp[i] = vP[i][0];
+	}
+
+//      set_mean_field_free_energy ();
+      set_mean_field_free_energy_romint (nPlot, xp, detailedSolutionYita1D);
 
       // print and write  solution;
       std::vector<double> x;
@@ -337,7 +349,7 @@ namespace SCFT
       std::vector<double> solution_values (quadrature_formula.size ());
       double x, fi;
       double y = L / 33;
-      double f0Bar = 0.161138909231016; // calculated from romint, use testFiBar.cc tp calculate it.
+      double f0Bar = 0.892581217773656; // calculated from romint, use testFiBar.cc tp calculate it.
 
       MappingQ1<dim> mapping;
       for (; cell != endc; ++cell)
@@ -371,6 +383,52 @@ namespace SCFT
       mean_field_free_energy = mean_field_free_energy / y; // Do I need it, yes
       mean_field_free_energy =
 	  (mean_field_free_energy / f0Bar / L + log (f0Bar)) / (-1000.);
+    }
+
+  template<int dim>
+    void
+    HeatEquation<dim>::set_mean_field_free_energy_romint (
+	int nPlot, std::vector<double> x,
+	std::vector<double> detailedSolutionYita1D)
+    {
+
+      double f0Bar = 0.892581217773656;
+
+      std::vector<double> f0_given;
+      f0_given.resize (nPlot);
+      f0_given.assign (nPlot, 1.0);
+
+      for (int i = 0; i < nPlot; i++)
+	{
+	  if (x[i] <= tau)
+	    {
+	      f0_given[i] = pow (
+		  (exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) - 1), 2)
+		  / pow (
+		      ((exp (4 * tau * x[i] / (tau * tau - x[i] * x[i])) + 1)),
+		      2);
+	      if (std::isnan (f0_given[i]))
+		f0_given[i] = 1.;
+
+	      f0_given[nPlot - i - 1] = f0_given[i];
+
+	    }
+	  else
+	    break;
+	}
+
+      for (int i = 0; i < nPlot; i++)
+	{
+	  detailedSolutionYita1D[i] = detailedSolutionYita1D[i] * f0_given[i];
+	}
+
+      mean_field_free_energy = romint (&detailedSolutionYita1D[0], nPlot - 1,
+				       L / (nPlot - 1));
+
+      mean_field_free_energy =
+	  (mean_field_free_energy / f0Bar / L + log (f0Bar)) / (-1000.);
+      printf ("integration=%2.15f\n", mean_field_free_energy);
+
     }
 
   template<int dim>

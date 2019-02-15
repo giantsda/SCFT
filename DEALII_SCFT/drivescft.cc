@@ -42,7 +42,7 @@
 #include <fstream>
 #include <vector>
 
-#define BROYDN
+//#define BROYDN
 
 //#define CHECK;
 int de; // My debug varaibe
@@ -69,8 +69,8 @@ namespace dealii
 				   const unsigned int component) const
     {
       (void) component;
-      Assert (component == 0, ExcIndexRange (component, 0, 1));
-      Assert (dim == 2, ExcNotImplemented ());
+      Assert(component == 0, ExcIndexRange (component, 0, 1));
+      Assert(dim == 2, ExcNotImplemented ());
       if (p[0] == 0. || p[0] == heat_equation_solver.get_L ())
 	return 0.;
       else
@@ -93,16 +93,16 @@ template<int dim>
 	    repetitions.push_back (1);
 	    GridGenerator::subdivided_hyper_rectangle (triangulation,
 						       repetitions,
-						       Point < 2 > (0.0, 0.0),
-						       Point < 2 > (L, L / N),
+						       Point<2> (0.0, 0.0),
+						       Point<2> (L, L / N),
 						       true);
 	  }
 	else
 	  {
-	    GridIn < dim > grid_in;
+	    GridIn<dim> grid_in;
 	    grid_in.attach_triangulation (triangulation);
 	    std::ifstream input_file ("yita_full_2D_N=033.msh");
-	    Assert (dim == 2, ExcInternalError ());
+	    Assert(dim == 2, ExcInternalError ());
 	    grid_in.read_msh (input_file);
 	  }
 	setup_system (); // The first time, the triangulation is generated and system is set up. The
@@ -227,10 +227,10 @@ SCFT_wrapper (int N, double * in, double * out)
 
 #ifdef BROYDN
   for (int i = 0; i < N - 2; i++)
-    out[i + 1] = res[i];
+  out[i + 1] = res[i];
 #else
   for (int i = 0; i < N - 2; i++)
-  out[i] = res[i];
+    out[i] = res[i];
 #endif
   int local_interation = heat_equation_solver.get_local_iteration ();
   //  for (int i = 0; i < N; i++)
@@ -266,7 +266,7 @@ main ()
 
       int N;
       std::vector<double> x_old; // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
-      double tau = 0.5302, L = 3.72374; // tau is for calculating f0_given, L is the length.
+      double tau = 5.30252230020752e-01, L = 3.72374357332160; // tau is for calculating f0_given, L is the length.
       read_yita_middle_1D (x_old, "inputFiles/N=33_for_read.txt", N); // read data from file, also set N; inputFiles/N=33_for_read.txt
       HeatEquation<2> other (tau, N, 2049, L); /* 2049 are points, 2048 intervals */
       heat_equation_solver = other; // I need this global class to do stuffs
@@ -298,14 +298,14 @@ main ()
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.1, 50);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 100000, N - 2, 0.001, 100); // hope fully solve in this line.
 #else
-	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
+		    broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
 #endif
 	  heat_equation_solver.print_and_save_yita_1D ();
 	  heat_equation_solver.output_results_for_yita_full_2D ();
 	  heat_equation_solver.output_mesh ();
 	  heat_equation_solver.refine_mesh (x_old,
 					    interpolated_solution_yita_1D);
-
+//	  scanf ("%d", &de);
 #ifdef BROYDN
 	  free_dmatrix (qt, 1, N - 2, 1, N - 2);
 	  free_dmatrix (r, 1, N - 2, 1, N - 2);
