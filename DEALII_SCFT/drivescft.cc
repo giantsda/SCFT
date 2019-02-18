@@ -69,8 +69,8 @@ namespace dealii
 				   const unsigned int component) const
     {
       (void) component;
-      Assert(component == 0, ExcIndexRange (component, 0, 1));
-      Assert(dim == 2, ExcNotImplemented ());
+      Assert (component == 0, ExcIndexRange (component, 0, 1));
+      Assert (dim == 2, ExcNotImplemented ());
       if (p[0] == 0. || p[0] == heat_equation_solver.get_L ())
 	return 0.;
       else
@@ -93,16 +93,16 @@ template<int dim>
 	    repetitions.push_back (1);
 	    GridGenerator::subdivided_hyper_rectangle (triangulation,
 						       repetitions,
-						       Point<2> (0.0, 0.0),
-						       Point<2> (L, L / N),
+						       Point < 2 > (0.0, 0.0),
+						       Point < 2 > (L, L / N),
 						       true);
 	  }
 	else
 	  {
-	    GridIn<dim> grid_in;
+	    GridIn < dim > grid_in;
 	    grid_in.attach_triangulation (triangulation);
-	    std::ifstream input_file ("yita_full_2D_N=033.msh");
-	    Assert(dim == 2, ExcInternalError ());
+	    std::ifstream input_file ("yita_full_2D_N=129.msh");
+	    Assert (dim == 2, ExcInternalError ());
 	    grid_in.read_msh (input_file);
 	  }
 	setup_system (); // The first time, the triangulation is generated and system is set up. The
@@ -295,10 +295,10 @@ main ()
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-3, 300, N - 2, 0.9, 3);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 800, N - 2, 0.9, 15);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.9, 30);
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.1, 50);
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 100000, N - 2, 0.001, 100); // hope fully solve in this line.
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 100000, N - 2, 0.5, 50); // hope fully solve in this line.
+	  // give a value like 0.001 will cause divergence.
 #else
-		    broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
+	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);
 #endif
 	  heat_equation_solver.print_and_save_yita_1D ();
 	  heat_equation_solver.output_results_for_yita_full_2D ();

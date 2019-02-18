@@ -58,7 +58,13 @@ adm_chen (void
       double err = 0.; // evaluate err
       for (int i = 0; i < n; i++)
 	{
-	  if (fabs (Y[k][i]) >= err)
+	  if (isnan(Y[k][i]))
+	    {
+	      fprintf (stderr, "And_chen: Y[%d][%d] is NaN or -NaN, abort!\n",
+		       k, i);
+	      exit (1);
+	    }
+	  else if (fabs (Y[k][i]) >= err)
 	    err = fabs (Y[k][i]);
 	}
       printf ("And_chen:iter=%d;N=%d,lk=%e,err=%2.4E\n", k, n, lk, err);

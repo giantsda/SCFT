@@ -82,7 +82,7 @@ namespace SCFT
 	  triangulation.begin_active_vertex (), endv =
 	  triangulation.end_vertex ();
       int i = 0;
-      Point<dim> p;
+      Point < dim > p;
       for (; vertex != endv; vertex++)
 	{
 	  p = vertex->vertex ();
@@ -137,11 +137,10 @@ namespace SCFT
 #undef float
       Vector<float> estimated_error_per_cell (triangulation.n_active_cells ());
 
-      KellyErrorEstimator<dim>::estimate (dof_handler,
-					  QGauss<dim - 1> (fe.degree + 1),
-					  typename FunctionMap<dim>::type (),
-					  yita_full_2D,
-					  estimated_error_per_cell);
+      KellyErrorEstimator < dim
+	  > ::estimate (dof_handler, QGauss < dim - 1 > (fe.degree + 1),
+			typename FunctionMap<dim>::type (), yita_full_2D,
+			estimated_error_per_cell);
 #define float double
 
 //      GridRefinement::refine_and_coarsen_fixed_fraction (
@@ -154,7 +153,7 @@ namespace SCFT
       for (cell = dof_handler.begin_active (); cell != endc; ++cell)
 	{
 //	  if (cell->refine_flag_set ())
-	  cell->set_refine_flag (RefinementCase<dim>::cut_axis (0));
+	  cell->set_refine_flag (RefinementCase < dim > ::cut_axis (0));
 	}
 
       std::vector<double> x, xp;
@@ -219,7 +218,7 @@ namespace SCFT
     void
     HeatEquation<dim>::output_results_for_yita_full_2D () const
     {
-      DataOut<dim> data_out;
+      DataOut < dim > data_out;
       data_out.attach_dof_handler (dof_handler);
       data_out.add_data_vector (yita_full_2D, "U");
       data_out.build_patches ();
@@ -260,7 +259,7 @@ namespace SCFT
 	}
 
       std::vector<double> detailedSolutionYita1D (nPlot);
-      Functions::FEFieldFunction<dim> fefunction (dof_handler, yita_full_2D);
+      Functions::FEFieldFunction < dim > fefunction (dof_handler, yita_full_2D);
       fefunction.value_list (vP, detailedSolutionYita1D);
 
       FILE * fp;
@@ -336,22 +335,23 @@ namespace SCFT
     {
       const QGauss<dim> quadrature_formula (fe.degree + 1);
       mean_field_free_energy = 0.;
-      FEValues<dim> fe_values (
-	  fe,
-	  quadrature_formula,
-	  update_values | update_gradients | update_JxW_values
-	      | update_quadrature_points);
+      FEValues < dim
+	  > fe_values (
+	      fe,
+	      quadrature_formula,
+	      update_values | update_gradients | update_JxW_values
+		  | update_quadrature_points);
       DoFHandler<2>::active_cell_iterator cell = dof_handler.begin_active (),
 	  endc = dof_handler.end ();
       const unsigned int n_q_points = quadrature_formula.size (); // which is 4.
-      Point<dim> p;
+      Point < dim > p;
       std::vector<Point<dim> > quadrature (n_q_points);
       std::vector<double> solution_values (quadrature_formula.size ());
       double x, fi;
       double y = L / 33;
       double f0Bar = 0.892581217773656; // calculated from romint, use testFiBar.cc tp calculate it.
 
-      MappingQ1<dim> mapping;
+      MappingQ1 < dim > mapping;
       for (; cell != endc; ++cell)
 	{
 	  fe_values.reinit (cell);
@@ -440,10 +440,10 @@ namespace SCFT
       x.pop_back (); // remove the last and the first elements
       x.erase (x.begin ()); // yita_middle_1D si a double*
 
-      MappingQ1<dim> mapping;
+      MappingQ1 < dim > mapping;
       std::vector<Point<dim> > support_points (dof_handler.n_dofs ());
-      DoFTools::map_dofs_to_support_points<dim> (mapping, dof_handler,
-						 support_points);
+      DoFTools::map_dofs_to_support_points < dim
+	  > (mapping, dof_handler, support_points);
       double* xp = (double*) malloc (sizeof(double) * support_points.size ());
       double* yp = (double*) malloc (sizeof(double) * support_points.size ());
       for (unsigned int i = 0; i < support_points.size (); i++)
@@ -480,10 +480,10 @@ namespace SCFT
       for (int i = 1; i < N - 1; i++)
 	yita_full_1D_temp[i] = yita_middle_1D[i - 1];
 
-      MappingQ1<dim> mapping;
+      MappingQ1 < dim > mapping;
       std::vector<Point<dim> > support_points (dof_handler.n_dofs ());
-      DoFTools::map_dofs_to_support_points<dim> (mapping, dof_handler,
-						 support_points);
+      DoFTools::map_dofs_to_support_points < dim
+	  > (mapping, dof_handler, support_points);
       double px;
       for (unsigned int i = 0; i < support_points.size (); i++)
 	{
@@ -590,11 +590,12 @@ namespace SCFT
       //					 QGauss<dim> (fe.degree + 1), A);
       const QGauss<dim> quadrature_formula (fe.degree + 1);
 
-      FEValues<dim> fe_values (
-	  fe,
-	  quadrature_formula,
-	  update_values | update_gradients | update_JxW_values
-	      | update_quadrature_points);
+      FEValues < dim
+	  > fe_values (
+	      fe,
+	      quadrature_formula,
+	      update_values | update_gradients | update_JxW_values
+		  | update_quadrature_points);
 
       const unsigned int dofs_per_cell = fe.dofs_per_cell;
       const unsigned int n_q_points = quadrature_formula.size ();
@@ -688,7 +689,7 @@ namespace SCFT
     void
     HeatEquation<dim>::output_results () const
     {
-      DataOut<dim> data_out;
+      DataOut < dim > data_out;
 
       data_out.attach_dof_handler (dof_handler);
       data_out.add_data_vector (Xnp1, "U");
