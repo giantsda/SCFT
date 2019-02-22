@@ -106,14 +106,14 @@ broydn (float x[], int n, int *check, void
       if (restrt)
 	{
 	  fdjac (n, x, fvec, r, vecfunc);
-	  printf ("r=:\n");
-	  for (int i = 1; i <= n; i++)
-	    {
-	      for (int j = 1; j <= n; j++)
-		printf ("%f,", r[i][j]);
-	      printf ("\n");
-	    }
-	  int de;
+//	  printf ("r=:\n");
+//	  for (int i = 1; i <= n; i++)
+//	    {
+//	      for (int j = 1; j <= n; j++)
+//		printf ("%f,", r[i][j]);
+//	      printf ("\n");
+//	    }
+//	  int de;
 //	  printf("continue?\n");
 //	  scanf("%d",&de);
 	  if (funcerr)

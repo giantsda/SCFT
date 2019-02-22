@@ -19,7 +19,7 @@ int
 adm_chen (void
 (*f) (int, double* in, double* out),
 	  double* x_old, double tol, int maxIteration, int n, double lmd,
-	  int nn)
+	  int nn, bool Final)
 /* It solves a function of type: void f (double* in, double* out, int n, struct parameterDumper* p) p is for some parameters you would like to pass
  * so that global variables can be avoided!
  * x_old is the initial guess; tol is the tolerance; maxIteration is the max iteration number you allowed.
@@ -125,7 +125,10 @@ adm_chen (void
       if (err < 0.03 && k > 100) // only modifiy lk if it is close to solution
 	lk *= lmd;
 
-      if (lk < 1e-5)  // reset lk if it is too small
+      if (!Final && lk < 1e-5)  // reset lk if it is too small
+	lk = lmd;
+
+      if (Final && lk < 1e-15)  // reset lk if it is too small
 	lk = lmd;
 
       k++;

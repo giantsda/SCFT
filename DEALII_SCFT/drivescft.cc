@@ -42,7 +42,7 @@
 #include <fstream>
 #include <vector>
 
-//#define BROYDN
+#define BROYDN
 
 //#define CHECK;
 int de; // My debug varaibe
@@ -295,7 +295,7 @@ main ()
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-3, 300, N - 2, 0.9, 3);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 800, N - 2, 0.9, 15);
 	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 1000, N - 2, 0.9, 30);
-	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 100000, N - 2, 0.5, 50); // hope fully solve in this line.
+	  adm_chen (&SCFT_wrapper, &x_old[1], 1e-7, 10000, N - 2, 0.1, 50,ture); // hope fully solve in this line.
 	  // give a value like 0.001 will cause divergence.
 #else
 	  broydn (&x_old[0], N - 2, &check, SCFT_wrapper);

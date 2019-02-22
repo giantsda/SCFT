@@ -31,7 +31,7 @@ int
 adm_chen (void
 (*f) (int, double* in, double* out),
 	  double* x_old, double tol, int maxIteration, int n, double lmd,
-	  int nn);
+	  int nn, bool Final = false);
 
 void
 spline_chen (double* x, double* y, double* xp, double* yp, int Nx, int Nxp,
