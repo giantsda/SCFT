@@ -65,7 +65,7 @@ ENDIF()
 
 
 DEAL_II_INITIALIZE_CACHED_VARIABLES()
-SET(CLEAN_UP_FILES a.out *.o scft drivescft *.vtk solution_store.txt solution_yita_1D*.txt *.msh detailedsolution*.txt)
+SET(CLEAN_UP_FILES a.out *.o scft drivescft *.vtk solution_store.txt solution_yita_1D*.txt *.msh detailedsolution*.txt log)
 
 DEAL_II_INVOKE_AUTOPILOT()
  

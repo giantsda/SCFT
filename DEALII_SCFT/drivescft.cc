@@ -285,7 +285,7 @@ main ()
       r = dmatrix (1, N - 2, 1, N - 2);
       d = dvector (1, N - 2);
       jc = 0;
-      err = 1e-7;
+      err = 1e-11;
 #endif
 
       for (int i = 0; i < 10; i++)
