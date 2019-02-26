@@ -247,10 +247,12 @@ namespace SCFT
     void
     HeatEquation<dim>::print_and_save_yita_1D ()
     {
+
+
       printf ("Solved ! \n Full_1D_solution: N=%d \n", get_N ());
 
       // get function value and nPlot points
-      int nPlot = pow (2, 17);
+      int nPlot = pow (2, 17)+1;
       std::vector<Point<dim> > vP (nPlot); // stores location that I am interested
       for (unsigned int i = 0; i < nPlot; i++)
 	{
@@ -394,6 +396,8 @@ namespace SCFT
 	std::vector<double> detailedSolutionYita1D)
     {
 
+    /* Use Romberg integration to integrate (not volume-average !) array f[]
+       having m+1 (m=2^(M-1)) data points with a uniform grid spacing of hh */
       double f0Bar = 0.892581217773656;
 
       std::vector<double> f0_given;
