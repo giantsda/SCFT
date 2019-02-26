@@ -250,9 +250,9 @@ namespace SCFT
       printf ("Solved ! \n Full_1D_solution: N=%d \n", get_N ());
 
       // get function value and nPlot points
-      int nPlot = 2000;
+      int nPlot = pow (2, 17);
       std::vector<Point<dim> > vP (nPlot); // stores location that I am interested
-      for (unsigned int i = 0; i < 2000; i++)
+      for (unsigned int i = 0; i < nPlot; i++)
 	{
 	  vP[i][0] = L * i / (nPlot - 1);
 	  vP[i][1] = 0.0;
@@ -262,8 +262,17 @@ namespace SCFT
       Functions::FEFieldFunction < dim > fefunction (dof_handler, yita_full_2D);
       fefunction.value_list (vP, detailedSolutionYita1D);
 
-      FILE * fp;
+      std::vector<double> xp (nPlot);
 
+      for (int i = 0; i < nPlot; i++)
+	{
+	  xp[i] = vP[i][0];
+	}
+
+      //      set_mean_field_free_energy ();
+      set_mean_field_free_energy_romint (nPlot, xp, detailedSolutionYita1D);
+
+      FILE * fp;
       // write nPlot points solution
       const std::string filename = "detailedsolution_yita_1D_N="
 	  + Utilities::int_to_string (get_N (), 3) + ".txt";
@@ -278,20 +287,13 @@ namespace SCFT
 
       for (int i = 0; i < nPlot; i++)
 	{
-	  fprintf (fp, "%i,%2.15f,%2.15f\n", i, vP[i][0],
+	  fprintf (fp, "%i,%2.15f,%2.15f\n", i, xp[i],
 		   detailedSolutionYita1D[i]);
 	}
+
+      fprintf (fp, "mean_field_free_energy, %2.15f \n", mean_field_free_energy);
       fclose (fp);
 
-      std::vector<double> xp (nPlot);
-
-      for (int i = 0; i < nPlot; i++)
-	{
-	  xp[i] = vP[i][0];
-	}
-
-//      set_mean_field_free_energy ();
-      set_mean_field_free_energy_romint (nPlot, xp, detailedSolutionYita1D);
 
       // print and write  solution;
       std::vector<double> x;

@@ -101,7 +101,7 @@ template<int dim>
 	  {
 	    GridIn < dim > grid_in;
 	    grid_in.attach_triangulation (triangulation);
-	    std::ifstream input_file ("yita_full_2D_N=129.msh");
+	    std::ifstream input_file ("yita_full_2D_N=1025.msh");
 	    Assert (dim == 2, ExcInternalError ());
 	    grid_in.read_msh (input_file);
 	  }
