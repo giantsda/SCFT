@@ -247,12 +247,28 @@ namespace SCFT
     void
     HeatEquation<dim>::print_and_save_yita_1D ()
     {
+      printf ("Solved ! \n Full_1D_solution: N=%d ", get_N ());
+      // get the 1D solution, note the end is extrapolated
+      double solution1D[N];
 
+      for (int i = 0; i < N; i++)
+	{
+	  solution1D[i] = yita_full_2D[lookup_table_1D_to_2D.find (i)->second];
+	}
 
-      printf ("Solved ! \n Full_1D_solution: N=%d \n", get_N ());
+      // get the solver error
+      double* res = this->run (&solution1D[1]);
+      double err = -1;
+      for (int i = 0; i < N; i++)
+	{
+	  if (fabs (res[i]) >= err)
+	    err = fabs(res[i]);
+	}
+
+      printf ("Error= %e,  ", err);
 
       // get function value and nPlot points
-      int nPlot = pow (2, 17)+1;
+      int nPlot = pow (2, 18) + 1;
       std::vector<Point<dim> > vP (nPlot); // stores location that I am interested
       for (unsigned int i = 0; i < nPlot; i++)
 	{
@@ -285,17 +301,16 @@ namespace SCFT
 	  printf ("cannot create file %s \n;", filename.c_str ());
 	  exit (-1);
 	}
-      fprintf (fp, "N= %d \n", get_N ());
-
+      fprintf (fp, "N= %d, ", get_N ());
+      fprintf (fp, "ERROR= %e \n", err);
+      fprintf (fp, "mean_field_free_energy, %2.15f \n", mean_field_free_energy);
       for (int i = 0; i < nPlot; i++)
 	{
 	  fprintf (fp, "%i,%2.15f,%2.15f\n", i, xp[i],
 		   detailedSolutionYita1D[i]);
 	}
 
-      fprintf (fp, "mean_field_free_energy, %2.15f \n", mean_field_free_energy);
       fclose (fp);
-
 
       // print and write  solution;
       std::vector<double> x;
@@ -310,17 +325,14 @@ namespace SCFT
 	  printf ("cannot create file %s \n;", filename.c_str ());
 	  exit (-1);
 	}
-      fprintf (fp, "N= %d \n", get_N ());
+      fprintf (fp, "N= %d, ", get_N ());
+      fprintf (fp, "ERROR= %e \n", err);
+      fprintf (fp, "mean_field_free_energy, %2.15f \n", mean_field_free_energy);
       for (int i = 0; i < N; i++)
 	{
-	  printf ("solution[%d]=%2.15f \n", i,
-		  yita_full_2D[lookup_table_1D_to_2D.find (i)->second]);
-	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i],
-		   yita_full_2D[lookup_table_1D_to_2D.find (i)->second]);
+//	  printf ("solution[%d]=%2.15f \n", i, solution1D[i]);
+	  fprintf (fp, "%d,%2.15f,%2.15f\n", i, x[i], solution1D[i]);
 	}
-
-      printf ("mean_field_free_energy=%2.15f \n", mean_field_free_energy);
-      fprintf (fp, "mean_field_free_energy, %2.15f \n", mean_field_free_energy);
 
       fclose (fp);
       printf ("%s is written. \n", filename.c_str ());
@@ -396,7 +408,7 @@ namespace SCFT
 	std::vector<double> detailedSolutionYita1D)
     {
 
-    /* Use Romberg integration to integrate (not volume-average !) array f[]
+      /* Use Romberg integration to integrate (not volume-average !) array f[]
        having m+1 (m=2^(M-1)) data points with a uniform grid spacing of hh */
       double f0Bar = 0.892581217773656;
 
@@ -433,7 +445,7 @@ namespace SCFT
 
       mean_field_free_energy =
 	  (mean_field_free_energy / f0Bar / L + log (f0Bar)) / (-1000.);
-      printf ("integration=%2.15f\n", mean_field_free_energy);
+      printf ("mean_field_free_energy=%2.15f\n", mean_field_free_energy);
 
     }
 
@@ -458,6 +470,7 @@ namespace SCFT
 	}
 
       double m = 0.;
+      // Now x.size() is N-2;
       spline_chen (&x[0], yita_middle_1D, xp, yp, x.size (),
 		   support_points.size (), &m);
 
@@ -708,6 +721,6 @@ namespace SCFT
     }
 
   template class HeatEquation<2> ;
-  template class HeatEquation<3> ;
+//  template class HeatEquation<3> ;  // There is a compiler error here if uncommented
 
 }

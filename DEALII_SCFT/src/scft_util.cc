@@ -30,6 +30,7 @@ read_yita_middle_1D (std::vector<double>& yita_middle, std::string filename,
       ;
     }
   sscanf (buff, "N= %d", &N);
+  fgets (buff, 255, file);  // jump the line of mean_field_free_energy
   yita_middle.resize (N,0.);
   while (fgets (buff, 255, file))
     {

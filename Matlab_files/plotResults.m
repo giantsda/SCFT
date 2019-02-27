@@ -1,5 +1,5 @@
 close all;
-path='/home/chen/Desktop/project/SCFT_results/O2/'
+path='/home/chen/Desktop/project/SCFT/DEALII_SCFT/'
 files=dir([path 'solution*.txt']);
 result=cell(length(files),1);
 detailedResult=cell(length(files),1);
@@ -7,16 +7,16 @@ for i=1:length(files)
     result{i}.name=files(i).name;
     fileID = fopen([path files(i).name],'r');
     tline = fgets(fileID);
-    N = sscanf(tline, '%*s %d',1);
-    result{i}.N=N;
-    [A,cnt] = fscanf(fileID,'%*f,%f,%f',[2 N]);
-    A=A.';
-    result{i}.x=A(:,1);
-    result{i}.theta=A(:,2);
-    tline = fgets(fileID);
+    tmp = sscanf(tline, 'N= %d, ERROR= %e',2);
+    result{i}.N=tmp(1);
+    result{i}.error=tmp(2);
     tline = fgets(fileID);
     mean_field_free_energy = sscanf(tline, '%*s %f',1);
     result{i}.mean_field_free_energy=mean_field_free_energy;
+    [A,cnt] = fscanf(fileID,'%*f,%f,%f',[2 result{i}.N]);
+    A=A.';
+    result{i}.x=A(:,1);
+    result{i}.theta=A(:,2);
     fclose(fileID);
 end
 
@@ -25,15 +25,21 @@ files=dir([path 'detailed*.txt']);
 for i=1:length(files)
     detailedResult{i}.name=files(i).name;
     fileID = fopen([path files(i).name],'r');
+    detailedResult{i}.name=files(i).name;
+    fileID = fopen([path files(i).name],'r');
     tline = fgets(fileID);
-    N = sscanf(tline, '%*s %d',1);
-    detailedResult{i}.N=N;
-    [A,cnt] = fscanf(fileID,'%*f,%f,%f',[2 2000]);
+    tmp = sscanf(tline, 'N= %d, ERROR= %e',2);
+    detailedResult{i}.N=tmp(1);
+    detailedResult{i}.error=tmp(2);
+    tline = fgets(fileID);
+    mean_field_free_energy = sscanf(tline, '%*s %f',1);
+    detailedResult{i}.mean_field_free_energy=mean_field_free_energy;
+    [A,cnt] = fscanf(fileID,'%*f,%f,%f',[2 2^18]);
     A=A.';
     detailedResult{i}.x=A(:,1);
     detailedResult{i}.theta=A(:,2);
     fclose(fileID);
-end
+ end
 
 %% sort files based on N
 A=struct2cell(cell2mat(result));

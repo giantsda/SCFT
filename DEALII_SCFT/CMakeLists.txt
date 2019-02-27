@@ -14,6 +14,7 @@ PROJECT(${TARGET}) #set project
 # page of the documentation.
 SET(TARGET_SRC
   drivescft.cc
+#  redoFxandshowError.cc
   )
 
 SET_PROPERTY(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
