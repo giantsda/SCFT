@@ -1,5 +1,5 @@
 close all;
-path='/home/chen/Desktop/project/SCFT/DEALII_SCFT/'
+path='/home/chen/Desktop/project/SCFT_results/O2/'
 files=dir([path 'solution*.txt']);
 result=cell(length(files),1);
 detailedResult=cell(length(files),1);
