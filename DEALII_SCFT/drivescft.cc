@@ -43,8 +43,8 @@
 #include <vector>
 
 #define BROYDN
+#define CHECK;
 
-//#define CHECK;
 int de; // My debug varaibe
 
 SCFT::HeatEquation<2> heat_equation_solver;
@@ -155,8 +155,8 @@ template<int dim>
 	      {
 		printf ("Got an NAN from solution_store:\n");
 		printf ("solution_store[%d][%d]=%2.15f\n", i + 1,
-		    timestep_number,
-		    solution_store[i + 1][timestep_number]);
+			timestep_number,
+			solution_store[i + 1][timestep_number]);
 		exit (-1);
 	      }
 #endif
@@ -165,7 +165,7 @@ template<int dim>
       }
 
     /* write solution; */
-    int write = 0;
+    int write = 1;
 
     if (write)
       {
@@ -196,11 +196,11 @@ template<int dim>
 	  {
 	    printf ("Got an NAN from romint(): f0[%d]=%2.15f\n", i, f0[i]);
 	    for (int k = 0; k < total_time_step; k++)
-	    printf ("v_for_romint[%d]=%2.15f\n", k, v_for_romint[k]);
+	      printf ("v_for_romint[%d]=%2.15f\n", k, v_for_romint[k]);
 	    printf ("solution_store[%d][0]=%f\n", i + 1,
-		solution_store[i + 1][0]);
+		    solution_store[i + 1][0]);
 	    printf ("solution_store[%d][%d]=%f\n", i + 1, total_time_step - 0,
-		solution_store[i + 1][total_time_step - 0]);
+		    solution_store[i + 1][total_time_step - 0]);
 	    exit (-1);
 	  }
 #endif
@@ -227,10 +227,10 @@ SCFT_wrapper (int N, double * in, double * out)
 
 #ifdef BROYDN
   for (int i = 0; i < N - 2; i++)
-  out[i + 1] = res[i];
+    out[i + 1] = res[i];
 #else
   for (int i = 0; i < N - 2; i++)
-    out[i] = res[i];
+  out[i] = res[i];
 #endif
   int local_interation = heat_equation_solver.get_local_iteration ();
   //  for (int i = 0; i < N; i++)
@@ -267,17 +267,43 @@ main ()
       int N;
       std::vector<double> x_old; // initial guess, the ends are bounded   // this is the middle of yita_1D, because the boundary are fixed.
       double tau = 5.30252230020752e-01, L = 3.72374357332160; // tau is for calculating f0_given, L is the length.
-      read_yita_middle_1D (x_old, "inputFiles/N=33_for_read.txt", N); // read data from file, also set N; inputFiles/N=33_for_read.txt
+//      read_yita_middle_1D (x_old, "inputFiles/N=33_for_read.txt", N); // read data from file, also set N; inputFiles/N=33_for_read.txt
+	  // read Wang' s results
+      N = 33; // set N by hand
+      FILE *file;
+      file = fopen ("../Exp_m32_n2048_IE.res", "r");
+      if (file == NULL)
+	{
+	  fprintf (stderr, "Can't open input file!\n");
+	  exit (1);
+	}
+      char buff[255];
+
+      double value, x;
+      for (int i = 0; i < 9; i++)
+	fgets (buff, 255, file);  // skip head
+      x_old.resize (N, 0.);
+      int i = 0;
+      while (fgets (buff, 255, file))
+	{
+	  sscanf (buff, "%*lf %*lf %lf", &value);
+	  x_old[i] = value;
+	  i++;
+	}
+      fclose (file);
+
       HeatEquation<2> other (tau, N, 2049, L); /* 2049 are points, 2048 intervals */
       heat_equation_solver = other; // I need this global class to do stuffs
       std::vector<double> interpolated_solution_yita_1D;
 
-      //      x_old.clear ();
-      //      x_old.resize (N, 0.);
-      //      double* res = heat_equation_solver.run (&x_old[1]);
-      //      for (int i = 0; i < N; i++)
-      //	printf ("%2.15f\n", res[i]);
+      x_old.clear ();
+      x_old.resize (N, 0.);
+      double* res = heat_equation_solver.run (&x_old[1]);
+      return 0;
       //      return 0;
+
+      while (1)
+	double* res = heat_equation_solver.run (&x_old[1]);
 
 #ifdef BROYDN
       int check = 1;
